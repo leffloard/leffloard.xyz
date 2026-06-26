@@ -1,168 +1,169 @@
-# 🚀 leffloard.xyz — Kişisel Portfolyo & Blog Projesi
+# leffloard.xyz - Personal Portfolio and Blog
 
-Modern web teknolojileri ile geliştirilmiş, şık tasarıma ve dinamik bir backend yapısına sahip kişisel portfolyo ve blog web sitesi. Frontend tarafında **React (Vite)**, backend tarafında ise **FastAPI** ve **MongoDB** kullanılmıştır.
+A personal portfolio and blog web application built with a modern web stack. The project features a React (Vite) frontend, a FastAPI backend, and a MongoDB database.
 
 ---
 
-## 🛠️ Teknoloji Yığını (Tech Stack)
+## Tech Stack
 
 ### Frontend
-- **React 19** & **Vite** — Hızlı ve modern arayüz geliştirme
-- **Tailwind CSS** — Esnek ve modern stil yönetimi
-- **React Router DOM** — Sayfa yönlendirmeleri ve dinamik blog rotaları
-- **shadcn/ui** & **Radix UI** — Premium, erişilebilir ve özelleştirilebilir arayüz bileşenleri
-- **Axios** — Backend API istekleri için HTTP istemcisi
-- **Lucide React** — Modern ve temiz ikon kütüphanesi
-- **Sonner & Toast** — Kullanıcı dostu bildirimler (toast notifications)
+- **React 19** & **Vite** - High-performance frontend library and build tool
+- **Tailwind CSS** - Utility-first styling framework
+- **React Router DOM** - Client-side routing for multi-page navigation and dynamic blog routes
+- **shadcn/ui** & **Radix UI** - Accessible and customizable UI component primitives
+- **Axios** - HTTP client for backend API communication
+- **Lucide React** - Icon library
+- **Sonner & Toast** - Toast notification management
 
-### Backend & Veritabanı
-- **FastAPI** — Yüksek performanslı ve asenkron Python API framework'ü
-- **MongoDB** & **Motor** — Asenkron MongoDB sürücüsü ile veritabanı yönetimi
-- **Pydantic v2** — Veri doğrulama ve şema yönetimi
-- **Uvicorn** — ASGI web sunucusu
+### Backend & Database
+- **FastAPI** - High-performance asynchronous Python API framework
+- **MongoDB** & **Motor** - Asynchronous MongoDB driver for python
+- **Pydantic v2** - Data validation and settings management using python type annotations
+- **Uvicorn** - ASGI web server implementation
 
 ---
 
-## 📂 Proje Yapısı
+## Project Structure
 
 ```text
 leffloard.xyz/
-├── frontend/                     # React (Vite) Arayüz Kodu
+├── frontend/                     # React application codebase
 │   ├── src/
-│   │   ├── components/           # Arayüz Bileşenleri (Hero, About, Blog vb.)
-│   │   │   ├── ui/               # Alt seviye UI bileşenleri (Button, Input vb.)
+│   │   ├── components/           # UI components (Hero, About, Blog, etc.)
+│   │   │   ├── ui/               # Low-level UI primitives (Button, Input, etc.)
 │   │   │   └── ...
-│   │   ├── data/                 # Statik veriler
-│   │   ├── hooks/                # Custom React hook'ları
-│   │   ├── lib/                  # Yardımcı kütüphaneler (utils.js vb.)
-│   │   ├── App.jsx               # Ana uygulama bileşeni
-│   │   └── main.jsx              # Giriş noktası
-│   ├── tailwind.config.js        # Tailwind konfigürasyonu
-│   └── package.json              # Bağımlılıklar ve script'ler
+│   │   ├── data/                 # Static mock data or configurations
+│   │   ├── hooks/                # Custom React hooks
+│   │   ├── lib/                  # Shared utility code
+│   │   ├── App.jsx               # Main application component
+│   │   └── main.jsx              # Application entry point
+│   ├── tailwind.config.js        # Tailwind CSS configuration
+│   └── package.json              # NPM dependencies and script definitions
 │
-├── backend/                      # FastAPI Backend Kodu
-│   ├── server.py                 # FastAPI sunucu kodu ve API yönlendiricileri
-│   ├── requirements.txt          # Python bağımlılık listesi
-│   └── .env.example              # Örnek çevre değişkenleri dosyası
+├── backend/                      # FastAPI application codebase
+│   ├── server.py                 # Core server logic and API routing
+│   ├── requirements.txt          # Python dependency specifications
+│   └── .env.example              # Sample environment variables file
 │
-├── tests/                        # Test klasörü
+├── tests/                        # Automated testing suite directory
 │   └── __init__.py
 │
-└── egefitnessalwaysinbussinies.bat # Hızlı başlatma scripti (Windows)
+└── egefitnessalwaysinbussinies.bat # Convenience startup batch script (Windows)
 ```
 
 ---
 
-## ⚡ Hızlı Başlangıç (Quick Start)
+## Getting Started
 
-Projeyi yerel makinenizde çalıştırmanın en kolay yolu, Windows kullanıcıları için hazırlanmış olan özel `.bat` scriptini kullanmaktır.
-
-### Tek Tıkla Çalıştırma (Windows)
-Proje kök dizininde bulunan **`egefitnessalwaysinbussinies.bat`** dosyasını çift tıklayarak çalıştırın:
-- Bu script, backend sunucusunu otomatik olarak yeni bir komut satırı (`cmd`) penceresinde başlatır.
-- Frontend geliştirme sunucusunu ise mevcut pencerede ayağa kaldırır.
+### Quick Start (Windows)
+To start both the frontend and backend development servers concurrently, execute the provided batch script in the root directory:
+```cmd
+egefitnessalwaysinbussinies.bat
+```
+This script opens a new command prompt window to host the FastAPI uvicorn server, and runs the Vite development server in the current terminal window.
 
 ---
 
-## 🔧 Detaylı Kurulum Adımları (Manual Setup)
+## Manual Installation
 
-Eğer projeyi adım adım manuel olarak çalıştırmak isterseniz aşağıdaki yönergeleri takip edebilirsiniz:
+### Prerequisites
+- Node.js (v18 or higher)
+- Python (v3.10 or higher)
+- MongoDB instance (running locally or hosted via MongoDB Atlas)
 
-### 1. Ön Gereksinimler
-- Bilgisayarınızda **Node.js** (v18+) ve **Python** (v3.10+) kurulu olmalıdır.
-- Çalışan bir **MongoDB** veritabanına erişiminiz olmalıdır (yerel veya MongoDB Atlas).
-
-### 2. Backend Kurulumu
-1. `backend` klasörüne geçin:
+### Backend Setup
+1. Navigate to the backend directory:
    ```bash
    cd backend
    ```
-2. Sanal ortam oluşturun ve aktif edin:
+2. Create and activate a virtual environment:
    ```bash
    python -m venv venv
-   # Windows için:
+   # Windows:
    venv\Scripts\activate
-   # macOS/Linux için:
+   # macOS/Linux:
    source venv/bin/activate
    ```
-3. Gerekli kütüphaneleri yükleyin:
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-4. `.env` dosyasını oluşturun ve veritabanı bilgilerinizi girin:
+4. Copy the environment configuration file and provide your database credentials:
    ```bash
    copy .env.example .env
-   # veya macOS/Linux için:
+   # macOS/Linux:
    cp .env.example .env
    ```
-   `.env` dosyasının içeriği:
+   Modify `.env` as required:
    ```env
    MONGO_URL=mongodb://localhost:27017
    DB_NAME=leffloard
    CORS_ORIGINS=http://localhost:5173
    ```
-5. Sunucuyu başlatın:
+5. Run the ASGI server:
    ```bash
    python -m uvicorn server:app --reload
    ```
-   Backend varsayılan olarak `http://127.0.0.1:8000` adresinde çalışacaktır.
+   The backend API will be available at `http://127.0.0.1:8000`.
 
-### 3. Frontend Kurulumu
-1. `frontend` klasörüne geçin:
+### Frontend Setup
+1. Navigate to the frontend directory:
    ```bash
    cd frontend
    ```
-2. Bağımlılıkları yükleyin:
+2. Install dependencies:
    ```bash
    npm install
    ```
-3. Geliştirme sunucusunu başlatın:
+3. Run the development server:
    ```bash
    npm run dev
    ```
-   Frontend varsayılan olarak `http://localhost:5173` adresinde çalışacaktır.
+   The frontend interface will be available at `http://localhost:5173`.
 
 ---
 
-## 📡 API Uç Noktaları (Endpoints)
+## API Endpoints
 
-FastAPI backend uygulaması aşağıdaki endpoint'leri sunar:
+The FastAPI backend exposes the following API routing structure:
 
-| Metot | Uç Nokta | Açıklama |
+| Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| **GET** | `/api/` | Çalışma durumunu test etmek için hoş geldiniz mesajı döner. |
-| **POST** | `/api/status` | Yeni bir durum kontrol kaydı oluşturur ve MongoDB'ye kaydeder. |
-| **GET** | `/api/status` | MongoDB'deki tüm durum kontrol kayıtlarını listeler. |
+| **GET** | `/api/` | Base endpoint, returns server greeting message. |
+| **POST** | `/api/status` | Commits a new status check document to the database. |
+| **GET** | `/api/status` | Retrieves a list of all status checks from the database. |
 
 ---
 
-## 🖥️ Arayüz Bileşenleri (Frontend Components)
+## Component Architecture
 
-Frontend uygulaması modüler bir bileşen yapısına sahiptir:
-- **Hero**: Dinamik giriş ve karşılama alanı.
-- **About**: Biyografi ve hakkımda bilgileri.
-- **Skills**: Görsel yetenek kartları.
-- **Experience & Education**: Zaman çizelgesi şeklinde tasarlanmış iş ve eğitim geçmişi.
-- **Projects**: Projelerin listelendiği ve detaylandırıldığı alan.
-- **Pricing**: Freelance hizmet paketleri ve fiyatlandırmaları.
-- **Blog & BlogDetails**: Makalelerin listelendiği ve dinamik olarak okunduğu blog sistemi.
-- **Contact**: Ziyaretçilerin doğrudan iletişim kurabileceği form alanı.
-
----
-
-## 🚀 Canlıya Alma (Deployment)
-
-1. **Frontend Derleme (Build):**
-   ```bash
-   cd frontend
-   npm run build
-   ```
-   Oluşan `dist` klasörünü Vercel, Netlify veya GitHub Pages gibi statik dosya barındırma servislerinde yayınlayabilirsiniz.
-2. **Backend:**
-   FastAPI uygulamasını Render, Railway veya kendi VPS sunucunuz üzerinde Docker/Uvicorn kullanarak canlıya alabilirsiniz.
+The React interface is composed of modular components:
+- **Hero**: Landing area introduction.
+- **About**: Biography and personal summary.
+- **Skills**: Visualization of technical proficiencies.
+- **Experience & Education**: Timeline representation of career and academic milestones.
+- **Projects**: Portfolio listing and search interface.
+- **Pricing**: Freelance rates and package matrices.
+- **Blog & BlogDetails**: Layouts for listing posts and reading individual blog entries.
+- **Contact**: User inquiry submission forms.
 
 ---
 
-## 📄 Lisans
+## Deployment
 
-Özel kişisel projedir. Tüm hakları saklıdır.
+### Frontend Production Build
+To generate static assets for hosting (e.g. Netlify, Vercel, or GitHub Pages):
+```bash
+cd frontend
+npm run build
+```
+Upload the contents of the generated `frontend/dist` directory to your hosting provider.
+
+### Backend Hosting
+The FastAPI backend can be served using Uvicorn or Gunicorn inside a containerized setup (Docker), or deployed directly to application hosts such as Render, Railway, or VPS environments.
+
+---
+
+## License
+
+Private personal project. All rights reserved.
