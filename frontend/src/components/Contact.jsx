@@ -1,32 +1,17 @@
-import React, { useState } from 'react';
-import { Mail, MapPin, Phone, Send, Github, Linkedin, Twitter } from 'lucide-react';
+import React, { lazy, Suspense } from 'react';
+import { Mail, MapPin, Phone, Github, Linkedin, Twitter, Loader2 } from 'lucide-react';
 import { personalInfo } from '../data/mock';
-import { toast } from '../hooks/use-toast';
+
+const RequestForm = lazy(() => import('./RequestForm'));
+
+const FormFallback = () => (
+  <div className="flex min-h-[640px] items-center justify-center" role="status">
+    <Loader2 className="animate-spin text-cyan-400" size={28} aria-hidden="true" />
+    <span className="sr-only">Loading the contact form...</span>
+  </div>
+);
 
 const Contact = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: ''
-  });
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    toast({
-      title: "Message Sent!",
-      description: "Thank you for reaching out. I'll get back to you soon.",
-    });
-    setFormData({ name: '', email: '', subject: '', message: '' });
-  };
-
   return (
     <section id="contact" className="py-32 bg-[#0f0f10]">
       <div className="max-w-7xl mx-auto px-6">
@@ -38,12 +23,12 @@ const Contact = () => {
             Let's Work Together
           </h2>
           <p className="text-gray-400 mt-4 max-w-2xl mx-auto">
-            Have a project in mind or just want to say hi? Feel free to reach out!
+            Book a call, request a revision on delivered work, or just say hi. I usually reply within 24 hours.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-12">
-          <div className="space-y-8">
+        <div className="grid lg:grid-cols-5 gap-12">
+          <div className="lg:col-span-2 space-y-8">
             <div>
               <h3 className="text-2xl font-bold text-white mb-6">Contact Information</h3>
               <div className="space-y-4">
@@ -91,6 +76,7 @@ const Contact = () => {
                   href={personalInfo.social.github}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="GitHub"
                   className="p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 hover:border-cyan-400 transition-all duration-300 hover:transform hover:scale-110"
                 >
                   <Github className="text-gray-400 hover:text-cyan-400 transition-colors" size={24} />
@@ -99,6 +85,7 @@ const Contact = () => {
                   href={personalInfo.social.linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="LinkedIn"
                   className="p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 hover:border-cyan-400 transition-all duration-300 hover:transform hover:scale-110"
                 >
                   <Linkedin className="text-gray-400 hover:text-cyan-400 transition-colors" size={24} />
@@ -107,6 +94,7 @@ const Contact = () => {
                   href={personalInfo.social.twitter}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="X (Twitter)"
                   className="p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 hover:border-cyan-400 transition-all duration-300 hover:transform hover:scale-110"
                 >
                   <Twitter className="text-gray-400 hover:text-cyan-400 transition-colors" size={24} />
@@ -115,80 +103,10 @@ const Contact = () => {
             </div>
           </div>
 
-          <div className="bg-[#0a0a0a] rounded-xl p-8 border border-gray-800">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-400 mb-2">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-lg text-white focus:outline-none focus:border-cyan-400 transition-colors"
-                  placeholder="Your name"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-lg text-white focus:outline-none focus:border-cyan-400 transition-colors"
-                  placeholder="your.email@example.com"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="subject" className="block text-sm font-medium text-gray-400 mb-2">
-                  Subject
-                </label>
-                <input
-                  type="text"
-                  id="subject"
-                  name="subject"
-                  value={formData.subject}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-lg text-white focus:outline-none focus:border-cyan-400 transition-colors"
-                  placeholder="What's this about?"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-400 mb-2">
-                  Message
-                </label>
-                <textarea
-                  id="message"
-                  name="message"
-                  value={formData.message}
-                  onChange={handleChange}
-                  required
-                  rows={5}
-                  className="w-full px-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-lg text-white focus:outline-none focus:border-cyan-400 transition-colors resize-none"
-                  placeholder="Tell me about your project..."
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full px-6 py-4 bg-cyan-400 text-black font-semibold rounded-lg hover:bg-cyan-300 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-400/50 flex items-center justify-center gap-2"
-              >
-                <Send size={20} />
-                Send Message
-              </button>
-            </form>
+          <div className="lg:col-span-3 bg-[#0a0a0a] rounded-xl p-5 sm:p-8 border border-gray-800">
+            <Suspense fallback={<FormFallback />}>
+              <RequestForm />
+            </Suspense>
           </div>
         </div>
       </div>
