@@ -31,6 +31,8 @@ leffloard.xyz/
 │   ├── src/
 │   │   ├── components/           # UI components (Hero, About, Blog, etc.)
 │   │   │   ├── ui/               # Low-level UI primitives (Button, Input, etc.)
+│   │   │   ├── admin/            # Admin panel served at /admin
+│   │   │   ├── RequestForm.jsx   # Appointment, revision and inquiry form
 │   │   │   └── ...
 │   │   ├── data/                 # Static mock data or configurations
 │   │   ├── hooks/                # Custom React hooks
@@ -157,7 +159,7 @@ The tests use an in-memory MongoDB replacement and mocked Discord/SMTP senders, 
    ```bash
    npm run dev
    ```
-   The frontend interface will be available at `http://localhost:5173`.
+   The frontend interface will be available at `http://localhost:5173`. Requests to `/api` are proxied to the backend at `http://127.0.0.1:8000`, so start the backend first to use the contact form and `/admin`.
 
 ---
 
@@ -216,7 +218,8 @@ The React interface is composed of modular components:
 - **Projects**: Portfolio listing and search interface.
 - **Pricing**: Freelance rates and package matrices.
 - **Blog & BlogDetails**: Layouts for listing posts and reading individual blog entries.
-- **Contact**: User inquiry submission forms.
+- **Contact**: Request form for booking a call, requesting a revision of delivered work or sending a general inquiry. Links such as `/?type=appointment#contact-form` (used by the header and the pricing page) preselect the request type, service and subject.
+- **Admin** (`/admin`): Password-protected panel to review requests, filter and search them, confirm, decline or complete them, schedule appointments, keep private notes and optionally email the client about the update.
 
 ---
 
