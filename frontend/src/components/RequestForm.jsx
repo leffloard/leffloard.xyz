@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
@@ -89,11 +89,14 @@ const FIELD_ORDER = [
   'service',
   'preferred_date',
   'preferred_time',
+  'timezone',
   'duration_minutes',
   'project_reference',
   'subject',
   'message',
 ];
+
+const FOCUS_TARGETS = { timezone: 'preferred_time' };
 
 const TYPE_FIELDS = {
   appointment: ['preferred_date', 'preferred_time', 'duration_minutes', 'timezone'],
@@ -115,6 +118,8 @@ const TEXT_RULES = {
   },
 };
 
+const LAST_SLOT = TIME_SLOTS[TIME_SLOTS.length - 1];
+
 const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]/;
 const CONTROL_CHARS_MULTILINE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -125,6 +130,15 @@ const charCount = (value) => [...value].length;
 function currentTime() {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
+function keepContactDetails(values) {
+  return {
+    ...EMPTY_VALUES,
+    name: values.name,
+    email: values.email,
+    contact_handle: values.contact_handle,
+  };
 }
 
 function isFieldActive(type, field) {
@@ -197,7 +211,7 @@ function buildPayload(type, values, timeZone) {
 }
 
 const fieldClass =
-  'h-12 w-full rounded-lg border border-gray-800 bg-[#0f0f10] px-4 text-base text-white shadow-none transition-colors placeholder:text-gray-600 md:text-base focus:border-cyan-400 focus-visible:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 focus-visible:ring-2 focus-visible:ring-cyan-400/30 aria-[invalid=true]:border-red-500/70';
+  'h-12 w-full rounded-lg border border-gray-800 bg-[#0f0f10] px-4 text-base text-white shadow-none transition-colors placeholder:text-gray-500 md:text-base focus:border-cyan-400 focus-visible:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 focus-visible:ring-2 focus-visible:ring-cyan-400/30 aria-[invalid=true]:border-red-500/70';
 
 function Field({ name, label, optional, hint, error, className, children }) {
   const id = fieldId(name);
@@ -210,7 +224,7 @@ function Field({ name, label, optional, hint, error, className, children }) {
         className="mb-2 flex items-baseline gap-2 text-sm font-medium text-gray-400"
       >
         {label}
-        {optional && <span className="text-xs font-normal text-gray-600">Optional</span>}
+        {optional && <span className="text-xs font-normal text-gray-400">Optional</span>}
       </Label>
       {children({ id, 'aria-invalid': error ? true : undefined, 'aria-describedby': describedBy })}
       {hint && (
@@ -273,14 +287,14 @@ function RequestSuccess({ result, headingRef, onReset }) {
         </li>
         <li className="flex gap-3">
           <span className="font-mono text-cyan-400">02</span>
-          <span>
-            You get an email at <span className="break-words text-white">{result.email}</span>. Check your spam
-            folder if nothing arrives.
+          <span className="min-w-0">
+            You get an email at <span className="text-white [overflow-wrap:anywhere]">{result.email}</span>. Check
+            your spam folder if nothing arrives.
           </span>
         </li>
       </ul>
       {result.id && (
-        <p className="mt-4 font-mono text-xs text-gray-600">Reference: {result.id.slice(0, 8)}</p>
+        <p className="mt-4 font-mono text-xs text-gray-400">Reference: {result.id.slice(0, 8)}</p>
       )}
       <button
         type="button"
@@ -308,11 +322,19 @@ const RequestForm = () => {
   const [result, setResult] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [dateOpen, setDateOpen] = useState(false);
+  const [timeZone, setTimeZone] = useState(browserTimeZone);
   const prefilledSubject = useRef(initialQuery.subject);
   const appliedKey = useRef(location.key);
   const successHeading = useRef(null);
   const errorToast = useRef(null);
-  const timeZone = useMemo(browserTimeZone, []);
+
+  const startOver = () => {
+    prefilledSubject.current = null;
+    setErrors({});
+    setAttempted(false);
+    setResult(null);
+    setStatusMessage('');
+  };
 
   useEffect(() => {
     if (appliedKey.current === location.key) return;
@@ -320,17 +342,18 @@ const RequestForm = () => {
     const query = readQuery(location.search);
     if (!query.type && !query.service && !query.subject) return;
     if (query.type) setType(query.type);
+    const submitted = result !== null;
+    if (submitted) startOver();
     setValues((prev) => {
-      const next = { ...prev };
+      const next = submitted ? keepContactDetails(prev) : { ...prev };
       if (query.service) next.service = query.service;
-      if (query.subject && (!prev.subject || prev.subject === prefilledSubject.current)) {
+      if (query.subject && (!next.subject || next.subject === prefilledSubject.current)) {
         next.subject = query.subject;
         prefilledSubject.current = query.subject;
       }
       return next;
     });
-    setResult(null);
-  }, [location.key, location.search]);
+  }, [location.key, location.search, result]);
 
   useEffect(() => {
     if (result) successHeading.current?.focus();
@@ -341,6 +364,7 @@ const RequestForm = () => {
   const selectedDate = parseISODate(values.preferred_date);
   const isToday = values.preferred_date === toISODate(today);
   const nowTime = currentTime();
+  const firstBookableDay = nowTime >= LAST_SLOT ? addDays(today, 1) : today;
   const activeOption = TYPE_OPTIONS.find((option) => option.value === type);
 
   const refreshErrors = (nextType, nextValues, changedFields) => {
@@ -377,7 +401,7 @@ const RequestForm = () => {
   };
 
   const focusField = (field) => {
-    const element = document.getElementById(fieldId(field));
+    const element = document.getElementById(fieldId(FOCUS_TARGETS[field] || field));
     if (element) {
       element.focus({ preventScroll: true });
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -423,6 +447,10 @@ const RequestForm = () => {
           const key = isFieldActive(type, field) ? field : '_form';
           if (!mapped[key]) mapped[key] = message;
         }
+        if (mapped.timezone && timeZone !== 'UTC') {
+          setTimeZone('UTC');
+          mapped.timezone = `Your device's time zone (${timeZone}) is not supported, so times are now in UTC. Check the time and send again.`;
+        }
         showErrors(mapped);
       } else {
         const detail = typeof error.response?.data?.detail === 'string' ? error.response.data.detail : '';
@@ -444,17 +472,8 @@ const RequestForm = () => {
   };
 
   const handleReset = () => {
-    setValues((prev) => ({
-      ...EMPTY_VALUES,
-      name: prev.name,
-      email: prev.email,
-      contact_handle: prev.contact_handle,
-    }));
-    prefilledSubject.current = null;
-    setErrors({});
-    setAttempted(false);
-    setResult(null);
-    setStatusMessage('');
+    setValues(keepContactDetails);
+    startOver();
     requestAnimationFrame(() => document.getElementById(fieldId('subject'))?.focus());
   };
 
@@ -552,7 +571,7 @@ const RequestForm = () => {
                   value={values.service || NO_SERVICE}
                   onValueChange={(value) => setField('service', value === NO_SERVICE ? '' : value)}
                 >
-                  <SelectTrigger {...props} className={cn(fieldClass, !values.service && 'text-gray-600')}>
+                  <SelectTrigger {...props} className={cn(fieldClass, !values.service && 'text-gray-400')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="border-gray-800 bg-[#0f0f10] text-white">
@@ -586,7 +605,7 @@ const RequestForm = () => {
                           className={cn(
                             fieldClass,
                             'flex items-center justify-between gap-2 text-left',
-                            !selectedDate && 'text-gray-600'
+                            !selectedDate && 'text-gray-500'
                           )}
                         >
                           <span id={`${id}-value`} className="truncate">
@@ -605,14 +624,14 @@ const RequestForm = () => {
                         <Calendar
                           mode="single"
                           selected={selectedDate || undefined}
-                          defaultMonth={selectedDate || today}
+                          defaultMonth={selectedDate || firstBookableDay}
                           onSelect={(date) => {
                             if (!date) return;
                             setField('preferred_date', toISODate(date));
                             setDateOpen(false);
                           }}
-                          disabled={[{ before: today }, { after: maxDate }]}
-                          fromMonth={today}
+                          disabled={[{ before: firstBookableDay }, { after: maxDate }]}
+                          fromMonth={firstBookableDay}
                           toMonth={maxDate}
                           weekStartsOn={1}
                           initialFocus
@@ -624,7 +643,7 @@ const RequestForm = () => {
                 <Field name="preferred_time" label="Time" error={errors.preferred_time}>
                   {(props) => (
                     <Select value={values.preferred_time} onValueChange={(value) => setField('preferred_time', value)}>
-                      <SelectTrigger {...props} className={cn(fieldClass, !values.preferred_time && 'text-gray-600')}>
+                      <SelectTrigger {...props} className={cn(fieldClass, !values.preferred_time && 'text-gray-500')}>
                         <SelectValue placeholder="--:--" />
                       </SelectTrigger>
                       <SelectContent className="max-h-72 border-gray-800 bg-[#0f0f10] text-white">
@@ -731,7 +750,7 @@ const RequestForm = () => {
                   }
                   className={cn(fieldClass, 'h-auto min-h-[150px] resize-y py-3')}
                 />
-                <p className="mt-1 text-right font-mono text-xs text-gray-600" aria-hidden="true">
+                <p className="mt-1 text-right font-mono text-xs text-gray-500" aria-hidden="true">
                   {charCount(values.message)} / {LIMITS.message}
                 </p>
               </>
@@ -762,8 +781,8 @@ const RequestForm = () => {
           <div>
             <button
               type="submit"
-              disabled={sending}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-6 py-4 font-semibold text-black transition-all duration-300 hover:bg-cyan-300 hover:shadow-lg hover:shadow-cyan-400/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:shadow-none"
+              aria-disabled={sending || undefined}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-6 py-4 font-semibold text-black transition-all duration-300 hover:bg-cyan-300 hover:shadow-lg hover:shadow-cyan-400/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a] aria-disabled:cursor-not-allowed aria-disabled:opacity-70 aria-disabled:hover:bg-cyan-400 aria-disabled:hover:shadow-none"
             >
               {sending ? (
                 <>
@@ -777,7 +796,7 @@ const RequestForm = () => {
                 </>
               )}
             </button>
-            <p className="mt-3 text-center text-xs text-gray-600">
+            <p className="mt-3 text-center text-xs text-gray-400">
               Your details are only used to reply to this request.
             </p>
           </div>
