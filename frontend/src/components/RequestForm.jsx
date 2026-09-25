@@ -274,7 +274,7 @@ function RequestSuccess({ result, headingRef, onReset }) {
         <li className="flex gap-3">
           <span className="font-mono text-cyan-400">02</span>
           <span>
-            You get an email at <span className="break-all text-white">{result.email}</span>. Check your spam
+            You get an email at <span className="break-words text-white">{result.email}</span>. Check your spam
             folder if nothing arrives.
           </span>
         </li>

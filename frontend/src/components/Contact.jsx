@@ -103,7 +103,10 @@ const Contact = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-3 bg-[#0a0a0a] rounded-xl p-5 sm:p-8 border border-gray-800">
+          <div
+            id="contact-form"
+            className="lg:col-span-3 scroll-mt-24 bg-[#0a0a0a] rounded-xl p-5 sm:p-8 border border-gray-800"
+          >
             <Suspense fallback={<FormFallback />}>
               <RequestForm />
             </Suspense>

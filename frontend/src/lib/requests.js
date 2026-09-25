@@ -46,7 +46,7 @@ export function contactHref({ type, service, subject } = {}) {
   if (service) params.set('service', service);
   if (subject) params.set('subject', subject);
   const query = params.toString();
-  return `/${query ? `?${query}` : ''}#contact`;
+  return `/${query ? `?${query}` : ''}#contact-form`;
 }
 
 export function fieldErrorsFromResponse(data) {

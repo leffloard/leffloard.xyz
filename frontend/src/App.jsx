@@ -21,6 +21,16 @@ import { Toaster } from './components/ui/toaster';
 
 const AdminPage = lazy(() => import('./components/admin/AdminPage'));
 
+function jumpInstantly(scroll) {
+  const root = document.documentElement;
+  const previous = root.style.scrollBehavior;
+  root.style.scrollBehavior = 'auto';
+  // Chrome only applies the new scroll-behavior after a style recalculation.
+  root.getClientRects();
+  scroll();
+  root.style.scrollBehavior = previous;
+}
+
 function ScrollManager() {
   const { pathname, hash, key } = useLocation();
   const previousPathname = useRef(pathname);
@@ -30,7 +40,7 @@ function ScrollManager() {
     previousPathname.current = pathname;
 
     if (!hash) {
-      if (pathChanged) window.scrollTo(0, 0);
+      if (pathChanged) jumpInstantly(() => window.scrollTo(0, 0));
       return undefined;
     }
 
@@ -40,7 +50,11 @@ function ScrollManager() {
     const scrollToTarget = () => {
       const element = document.getElementById(id);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+        if (pathChanged) {
+          jumpInstantly(() => element.scrollIntoView());
+        } else {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
       } else if (attempts < 60) {
         attempts += 1;
         frame = requestAnimationFrame(scrollToTarget);
