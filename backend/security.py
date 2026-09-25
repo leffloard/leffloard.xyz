@@ -1,9 +1,10 @@
+import ipaddress
 import math
 import threading
 import time
 from collections import deque
 from datetime import UTC, datetime, timedelta
-from typing import Callable
+from typing import Callable, Optional
 
 import bcrypt
 import jwt
@@ -58,12 +59,39 @@ class RateLimiter:
         self._next_sweep = now + self.window
 
 
-def client_ip(request: Request, trust_proxy: bool) -> str:
-    if trust_proxy:
-        forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        if forwarded:
-            return forwarded
-    return request.client.host if request.client else "unknown"
+def _address_key(value: str) -> Optional[str]:
+    """Normalises an address, grouping IPv6 by /64 because a single host usually controls a whole /64."""
+    value = value.strip()
+    if value.startswith("[") and "]" in value:
+        value = value[1 : value.index("]")]
+    elif value.count(":") == 1:
+        value = value.partition(":")[0]
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    if address.version == 6:
+        if address.ipv4_mapped:
+            return str(address.ipv4_mapped)
+        return f"{ipaddress.IPv6Address(int(address) >> 64 << 64)}/64"
+    return str(address)
+
+
+def client_key(request: Request, trusted_proxies: int) -> str:
+    """Rate-limit key for the visitor.
+
+    Each proxy appends the address it was connected from to X-Forwarded-For, so only the last `trusted_proxies`
+    entries are trustworthy and anything to their left was sent by the client. Without trusted proxies the
+    connecting address is used, which uvicorn already resolves for proxies listed in FORWARDED_ALLOW_IPS.
+    """
+    peer = request.client.host if request.client else ""
+    if trusted_proxies:
+        forwarded = [entry for value in request.headers.getlist("x-forwarded-for") for entry in value.split(",")]
+        if len(forwarded) >= trusted_proxies:
+            key = _address_key(forwarded[-trusted_proxies])
+            if key:
+                return key
+    return _address_key(peer) or peer[:64] or "unknown"
 
 
 def hash_password(password: str) -> str:

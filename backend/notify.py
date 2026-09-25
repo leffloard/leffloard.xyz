@@ -37,11 +37,13 @@ STATUS_PHRASES = {
 DISCORD_DESCRIPTION_LIMIT = 3000
 DISCORD_FIELD_LIMIT = 1024
 WEBHOOK_TIMEOUT_SECONDS = 10
-SMTP_TIMEOUT_SECONDS = 20
+SMTP_TIMEOUT_SECONDS = 10
+CLIENT_EMAIL_TIMEOUT_SECONDS = 25
 
 MARKDOWN_CHARACTERS = re.compile(r"([\\`*_~|\[\]()<>#])")
 LIST_MARKERS = re.compile(r"(?m)^(\s*)([-+])(?=\s)")
 MASS_MENTIONS = re.compile(r"@(everyone|here)", re.IGNORECASE)
+ENCODED_WORD = re.compile(r"=\?[^?]*\?[bBqQ]\?.*?\?=")
 
 
 class WebhookError(Exception):
@@ -57,6 +59,16 @@ def discord_safe(text: str, limit: int = DISCORD_FIELD_LIMIT) -> str:
     text = LIST_MARKERS.sub(r"\1\\\2", text)
     text = MASS_MENTIONS.sub("@​\\1", text)
     return truncate(text, limit)
+
+
+def header_text(text: str) -> str:
+    """Keeps client text on one header line and stops the email parser from decoding RFC 2047 words hidden in it."""
+    text = " ".join(text.split())
+    return text.replace("=?", "= ?") if ENCODED_WORD.search(text) else text
+
+
+def mailbox(name: str, address: str) -> str:
+    return formataddr((header_text(name), address))
 
 
 def appointment_start(doc: dict[str, Any]) -> Optional[datetime]:
@@ -148,9 +160,9 @@ def build_owner_email(doc: dict[str, Any], settings: Settings) -> EmailMessage:
     return new_email(
         settings,
         to=settings.notify_email_to,
-        subject=f"{title} from {doc['name']}: {doc['subject']}",
+        subject=header_text(f"{title} from {doc['name']}: {doc['subject']}"),
         body="\n".join(lines) + "\n",
-        reply_to=formataddr((doc["name"], doc["email"])),
+        reply_to=mailbox(doc["name"], doc["email"]),
     )
 
 
@@ -170,7 +182,7 @@ def build_client_email(doc: dict[str, Any], settings: Settings, client_message: 
     label = TYPE_LABELS[doc["type"]]
     status = doc["status"]
     lines = [f"Hi {doc['name']},", "", f'Your {label} "{doc["subject"]}" {STATUS_PHRASES[status]}.']
-    scheduled = format_scheduled_time(doc)
+    scheduled = format_scheduled_time(doc) if status == "confirmed" else None
     if scheduled:
         lines += ["", f"Scheduled time: {scheduled}"]
         if doc.get("duration_minutes"):
@@ -182,7 +194,7 @@ def build_client_email(doc: dict[str, Any], settings: Settings, client_message: 
         lines.append(settings.site_url)
     return new_email(
         settings,
-        to=formataddr((doc["name"], doc["email"])),
+        to=mailbox(doc["name"], doc["email"]),
         subject=f"Your {label}: {status}",
         body="\n".join(lines) + "\n",
         reply_to=settings.notify_email_to,
@@ -228,8 +240,13 @@ async def notify_new_request(doc: dict[str, Any], settings: Settings) -> None:
 
 
 async def notify_client(doc: dict[str, Any], settings: Settings, client_message: Optional[str]) -> bool:
+    """Emails the client while the admin waits, so it gives up well before the admin panel's request times out."""
     try:
-        await send_email(settings, build_client_email(doc, settings, client_message))
+        message = build_client_email(doc, settings, client_message)
+        await asyncio.wait_for(send_email(settings, message), CLIENT_EMAIL_TIMEOUT_SECONDS)
+    except TimeoutError:
+        logger.error("Client email for request %s timed out; the SMTP server did not respond.", doc["id"])
+        return False
     except Exception as exc:
         logger.error("Client email for request %s failed: %s", doc["id"], exc)
         return False

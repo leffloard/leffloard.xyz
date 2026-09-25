@@ -2,10 +2,15 @@ import asyncio
 import email
 import email.policy
 import json
+import logging
+import mimetypes
 import sys
+import threading
+import time
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from email.message import EmailMessage
+from email.utils import getaddresses
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -14,6 +19,8 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 from pymongo.errors import ServerSelectionTimeoutError
+from starlette.requests import Request
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import config
 import hash_password
@@ -354,12 +361,64 @@ def test_rate_limit_ignores_forwarded_for_unless_proxy_is_trusted(api, configure
         assert api.post("/api/requests", json=inquiry(), headers=headers).status_code == 201
     assert api.post("/api/requests", json=inquiry(), headers={"X-Forwarded-For": "198.51.100.1"}).status_code == 429
 
-    configure(trust_proxy=True)
-    for _ in range(5):
-        headers = {"X-Forwarded-For": "198.51.100.7, 10.0.0.1"}
+
+def test_trusted_proxy_keys_on_the_address_it_appended(api, configure):
+    configure(trusted_proxies=1)
+    for index in range(5):
+        headers = {"X-Forwarded-For": f"10.9.{index}.1, 198.51.100.66"}
         assert api.post("/api/requests", json=inquiry(), headers=headers).status_code == 201
-    assert api.post("/api/requests", json=inquiry(), headers={"X-Forwarded-For": "198.51.100.7"}).status_code == 429
-    assert api.post("/api/requests", json=inquiry(), headers={"X-Forwarded-For": "198.51.100.8"}).status_code == 201
+    spoofed = {"X-Forwarded-For": "10.9.99.1, 198.51.100.66"}
+    assert api.post("/api/requests", json=inquiry(), headers=spoofed).status_code == 429
+    assert api.post("/api/requests", json=inquiry(), headers={"X-Forwarded-For": "198.51.100.67"}).status_code == 201
+
+
+def test_spoofed_forwarded_for_cannot_lock_out_another_address(api, configure):
+    configure(trusted_proxies=1)
+    attacker = {"X-Forwarded-For": "203.0.113.5, 198.51.100.66"}
+    for _ in range(5):
+        assert api.post("/api/admin/login", json={"password": "guess"}, headers=attacker).status_code == 401
+    assert api.post("/api/admin/login", json={"password": "guess"}, headers=attacker).status_code == 429
+    victim = {"X-Forwarded-For": "203.0.113.5"}
+    assert api.post("/api/admin/login", json={"password": ADMIN_PASSWORD}, headers=victim).status_code == 200
+
+
+def test_same_machine_proxy_needs_no_trust_setting():
+    proxied = ProxyHeadersMiddleware(server.app, trusted_hosts="testclient")
+    with TestClient(proxied) as client:
+        for index in range(5):
+            headers = {"X-Forwarded-For": f"10.9.{index}.1, 198.51.100.66"}
+            assert client.post("/api/requests", json=inquiry(), headers=headers).status_code == 201
+        spoofed = {"X-Forwarded-For": "10.9.99.1, 198.51.100.66"}
+        assert client.post("/api/requests", json=inquiry(), headers=spoofed).status_code == 429
+        other = {"X-Forwarded-For": "10.9.99.1, 198.51.100.67"}
+        assert client.post("/api/requests", json=inquiry(), headers=other).status_code == 201
+
+
+def http_request(peer, *forwarded):
+    headers = [(b"x-forwarded-for", value.encode()) for value in forwarded]
+    return Request({"type": "http", "headers": headers, "client": (peer, 50000) if peer else None})
+
+
+@pytest.mark.parametrize(
+    ("peer", "forwarded", "trusted_proxies", "expected"),
+    [
+        ("198.51.100.1", ["203.0.113.9"], 0, "198.51.100.1"),
+        ("127.0.0.1", ["203.0.113.9, 198.51.100.66"], 1, "198.51.100.66"),
+        ("127.0.0.1", ["203.0.113.9", "198.51.100.66"], 1, "198.51.100.66"),
+        ("127.0.0.1", ["203.0.113.9, 198.51.100.66, 10.0.0.2"], 2, "198.51.100.66"),
+        ("127.0.0.1", ["198.51.100.66"], 2, "127.0.0.1"),
+        ("127.0.0.1", [], 1, "127.0.0.1"),
+        ("127.0.0.1", ["203.0.113.9, not-an-ip"], 1, "127.0.0.1"),
+        ("127.0.0.1", ["198.51.100.66:4711"], 1, "198.51.100.66"),
+        ("127.0.0.1", ["[2001:db8:1:2:3:4:5:6]:443"], 1, "2001:db8:1:2::/64"),
+        ("2001:db8:1:2:aaaa::1", [], 0, "2001:db8:1:2::/64"),
+        ("::ffff:198.51.100.7", [], 0, "198.51.100.7"),
+        ("testclient", [], 0, "testclient"),
+        (None, [], 0, "unknown"),
+    ],
+)
+def test_client_key(peer, forwarded, trusted_proxies, expected):
+    assert security.client_key(http_request(peer, *forwarded), trusted_proxies) == expected
 
 
 def test_rate_limiter_window_and_release():
@@ -527,6 +586,29 @@ def test_post_webhook_raises_on_error_status(monkeypatch):
     assert calls == [{"embeds": []}, {"embeds": []}]
 
 
+def test_webhook_url_never_reaches_the_logs(api, outbox, configure, monkeypatch, caplog):
+    webhook_url = "https://discord.test/api/webhooks/42/SECRET-WEBHOOK-TOKEN"
+    configure(discord_webhook_url=webhook_url)
+    responses = iter([httpx.Response(204), httpx.Response(404, json={"message": "Unknown Webhook"})])
+    calls = []
+
+    def handler(request):
+        calls.append(str(request.url))
+        if len(calls) == 3:
+            raise httpx.ConnectError("connection refused", request=request)
+        return next(responses)
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(notify.httpx, "AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(handler), **kwargs))
+    monkeypatch.setattr(notify, "post_webhook", REAL_POST_WEBHOOK)
+    caplog.set_level(logging.DEBUG)
+    for _ in range(3):
+        assert api.post("/api/requests", json=inquiry()).status_code == 201
+    assert calls == [webhook_url] * 3
+    assert "Discord notification" in caplog.text
+    assert "SECRET-WEBHOOK-TOKEN" not in caplog.text
+
+
 def non_ascii_doc(subject: str) -> dict:
     return {
         "id": "abc",
@@ -562,6 +644,31 @@ def test_long_non_ascii_subject_survives_folding():
     subject = "Bot için görüşme ve çok uzun bir konu satırı " * 2
     owner = roundtrip(notify.build_owner_email(non_ascii_doc(subject.strip()), make_settings()))
     assert owner["Subject"] == f"New inquiry from Şükrü Öztürk: {subject.strip()}"
+
+
+@pytest.mark.parametrize(
+    ("name", "subject", "stored_name", "stored_subject"),
+    [
+        ("Ann\u2028Lee", "Quote\u2029for site", "Ann Lee", "Quote for site"),
+        ("=?utf-8?q?A=0AB?=", "=?utf-8?b?QQpC?= plan", "=?utf-8?q?A=0AB?=", "=?utf-8?b?QQpC?= plan"),
+    ],
+)
+def test_owner_and_client_emails_survive_line_separators_and_encoded_words(
+    admin, outbox, name, subject, stored_name, stored_subject
+):
+    response = admin.post("/api/requests", json=inquiry(name=name, subject=subject, message="One\u2028two"))
+    assert response.status_code == 201
+    request_id = response.json()["id"]
+    doc = stored(request_id)
+    assert (doc["name"], doc["subject"], doc["message"]) == (stored_name, stored_subject, "One\ntwo")
+
+    patched = admin.patch(f"/api/admin/requests/{request_id}", json={"status": "confirmed", "notify_client": True})
+    assert patched.json()["client_notified"] is True
+    owner, client = (roundtrip(message) for message in outbox.emails)
+    assert "\n" not in owner["Subject"] and "\n" not in owner["Reply-To"].addresses[0].display_name
+    assert owner["Reply-To"].addresses[0].addr_spec == "alan@example.com"
+    assert client["To"].addresses[0].addr_spec == "alan@example.com"
+    assert [address for _, address in getaddresses([str(outbox.emails[1]["To"])])] == ["alan@example.com"]
 
 
 class FakeSMTP:
@@ -707,9 +814,11 @@ def test_token_is_rejected_after_secret_rotation(api, token, configure):
 
 
 def test_admin_me_reports_notification_channels(admin, configure):
-    assert admin.get("/api/admin/me").json() == {"notifications": {"discord": True, "email": True}}
+    assert admin.get("/api/admin/me").json() == {"notifications": {"discord": True, "email": True, "client_email": True}}
     configure(discord_webhook_url="", notify_email_to="")
-    assert admin.get("/api/admin/me").json() == {"notifications": {"discord": False, "email": False}}
+    assert admin.get("/api/admin/me").json() == {"notifications": {"discord": False, "email": False, "client_email": True}}
+    configure(smtp_host="")
+    assert admin.get("/api/admin/me").json() == {"notifications": {"discord": True, "email": False, "client_email": False}}
 
 
 # Admin request management
@@ -891,6 +1000,18 @@ def test_patch_notifies_client(admin, outbox):
     assert SITE_URL in body
 
 
+def test_client_email_mentions_the_scheduled_time_only_when_confirmed(admin, outbox):
+    request_id = admin.post("/api/requests", json=appointment()).json()["id"]
+    admin.patch(f"/api/admin/requests/{request_id}", json={"status": "confirmed", "scheduled_at": "2026-10-01T11:30:00Z"})
+    outbox.emails.clear()
+    for status in ("declined", "completed", "new"):
+        body = admin.patch(f"/api/admin/requests/{request_id}", json={"status": status, "notify_client": True}).json()
+        assert body["client_notified"] is True
+        assert body["scheduled_at"] == "2026-10-01T11:30:00+00:00"
+    assert len(outbox.emails) == 3
+    assert not any("Scheduled time" in email_body(message) for message in outbox.emails)
+
+
 def test_patch_client_email_for_other_types(admin, outbox):
     request_id = admin.post("/api/requests", json=revision()).json()["id"]
     outbox.emails.clear()
@@ -918,6 +1039,25 @@ def test_patch_client_notification_without_smtp_or_on_failure(admin, outbox, con
     response = admin.patch(f"/api/admin/requests/{request_id}", json={"notify_client": True})
     assert response.status_code == 200
     assert response.json()["client_notified"] is False
+
+
+def test_unresponsive_smtp_does_not_hold_up_the_admin(admin, outbox, monkeypatch):
+    request_id = admin.post("/api/requests", json=appointment()).json()["id"]
+    released = threading.Event()
+
+    def hanging_smtp(settings, message):
+        released.wait(5)
+
+    monkeypatch.setattr(notify, "deliver_email", hanging_smtp)
+    monkeypatch.setattr(notify, "CLIENT_EMAIL_TIMEOUT_SECONDS", 0.2)
+    started = time.monotonic()
+    response = admin.patch(f"/api/admin/requests/{request_id}", json={"status": "confirmed", "notify_client": True})
+    elapsed = time.monotonic() - started
+    released.set()
+    assert response.status_code == 200
+    assert response.json()["status"] == "confirmed"
+    assert response.json()["client_notified"] is False
+    assert elapsed < 2
 
 
 def test_delete(admin):
@@ -1002,6 +1142,14 @@ def test_real_files_are_served(api):
     assert robots.status_code == 200 and robots.text.startswith("User-agent")
 
 
+def test_frontend_types_do_not_depend_on_the_system_registry(api, monkeypatch):
+    monkeypatch.setitem(mimetypes.types_map, ".js", "text/plain")
+    monkeypatch.setitem(mimetypes.types_map, ".css", "text/plain")
+    server.register_frontend_types()
+    assert api.get("/assets/index-abc123.js").headers["content-type"].startswith("text/javascript")
+    assert mimetypes.guess_type("index.css")[0] == "text/css"
+
+
 @pytest.mark.parametrize(("method", "path"), [("GET", "/api/unknown"), ("GET", "/api"), ("POST", "/api/unknown"), ("GET", "/api/admin/unknown/x")])
 def test_unknown_api_paths_stay_json(api, method, path):
     response = api.request(method, path)
@@ -1035,22 +1183,27 @@ def test_load_settings(monkeypatch, tmp_path):
     monkeypatch.setenv("NOTIFY_EMAIL_TO", "me@gmail.com")
     monkeypatch.setenv("SITE_URL", "leffloard.xyz/")
     monkeypatch.setenv("CORS_ORIGINS", "https://a.example/, https://b.example")
-    monkeypatch.setenv("TRUST_PROXY", "1")
+    monkeypatch.setenv("TRUST_PROXY", "yes")
     monkeypatch.setenv("FRONTEND_DIST", str(tmp_path))
     settings = config.load_settings()
     assert settings.admin_enabled and settings.owner_email_enabled
     assert (settings.smtp_security, settings.smtp_port, settings.smtp_from) == ("ssl", 465, "me@gmail.com")
     assert settings.site_url == "https://leffloard.xyz"
     assert settings.cors_origins == ("https://a.example", "https://b.example")
-    assert settings.trust_proxy is True
+    assert settings.trusted_proxies == 1
     assert settings.frontend_dist == tmp_path.resolve()
+
+    monkeypatch.setenv("TRUST_PROXY", "2")
+    assert config.load_settings().trusted_proxies == 2
 
     monkeypatch.setenv("ADMIN_PASSWORD_HASH", "plain-text-password")
     monkeypatch.setenv("ADMIN_JWT_SECRET", "too-short")
     monkeypatch.setenv("SMTP_SECURITY", "tls")
+    monkeypatch.setenv("TRUST_PROXY", "cloudflare")
     settings = config.load_settings()
     assert not settings.admin_enabled and not settings.smtp_enabled
-    assert len(settings.problems) == 3
+    assert settings.trusted_proxies == 0
+    assert len(settings.problems) == 4
 
 
 def test_settings_repr_hides_secrets():
