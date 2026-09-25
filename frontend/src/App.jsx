@@ -17,6 +17,7 @@ import BlogDetails from "./components/BlogDetails";
 import Contact from './components/Contact';
 import Pricing from './components/Pricing';
 import Footer from './components/Footer';
+import ErrorBoundary from './components/ErrorBoundary';
 import { Toaster } from './components/ui/toaster';
 
 const AdminPage = lazy(() => import('./components/admin/AdminPage'));
@@ -44,7 +45,12 @@ function ScrollManager() {
       return undefined;
     }
 
-    const id = decodeURIComponent(hash.slice(1));
+    let id = hash.slice(1);
+    try {
+      id = decodeURIComponent(id);
+    } catch {
+      // A malformed escape such as "#%" cannot name an element; look it up as typed.
+    }
     let frame;
     let attempts = 0;
     const scrollToTarget = () => {
@@ -117,9 +123,11 @@ function App() {
           <Route
             path="/admin"
             element={
-              <Suspense fallback={<AdminFallback />}>
-                <AdminPage />
-              </Suspense>
+              <ErrorBoundary className="min-h-screen" title="The admin panel could not be loaded.">
+                <Suspense fallback={<AdminFallback />}>
+                  <AdminPage />
+                </Suspense>
+              </ErrorBoundary>
             }
           />
 

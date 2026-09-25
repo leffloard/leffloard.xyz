@@ -38,6 +38,10 @@ const TYPE_FILTERS = [
 
 const EMPTY_COUNTS = { new: 0, confirmed: 0, declined: 0, completed: 0 };
 
+// aria-disabled rather than disabled keeps keyboard focus on the button while a request is running.
+const pageButtonClass =
+  'rounded-lg border border-gray-700 p-2 text-white transition-colors hover:border-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:border-gray-700';
+
 function useDebouncedValue(value, delay) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -303,9 +307,11 @@ const AdminDashboard = ({ api, onLogout }) => {
                     className="gap-1.5 px-3 text-gray-400 data-[state=active]:bg-gray-800 data-[state=active]:text-white"
                   >
                     {tab.label}
-                    <span className="rounded bg-black/40 px-1.5 font-mono text-xs text-gray-400">
-                      {tab.value === 'all' ? allCount : Number(counts[tab.value]) || 0}
-                    </span>
+                    {data && (
+                      <span className="rounded bg-black/40 px-1.5 font-mono text-xs text-gray-400">
+                        {tab.value === 'all' ? allCount : Number(counts[tab.value]) || 0}
+                      </span>
+                    )}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -338,7 +344,7 @@ const AdminDashboard = ({ api, onLogout }) => {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search name, email, subject..."
                   aria-label="Search requests"
-                  className="h-10 border-gray-800 bg-[#0f0f10] pl-9 pr-9 text-white placeholder:text-gray-600 focus-visible:ring-2 focus-visible:ring-cyan-400/40 [&::-webkit-search-cancel-button]:hidden"
+                  className="h-10 border-gray-800 bg-[#0f0f10] pl-9 pr-9 text-white placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-cyan-400/40 [&::-webkit-search-cancel-button]:hidden"
                 />
                 {search && (
                   <button
@@ -363,13 +369,17 @@ const AdminDashboard = ({ api, onLogout }) => {
               >
                 <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-4 py-3 text-sm text-gray-500 sm:px-5">
                   <span aria-live="polite">
-                    {data ? `${total} ${total === 1 ? 'request' : 'requests'}` : 'Loading requests...'}
+                    {data
+                      ? `${total} ${total === 1 ? 'request' : 'requests'}`
+                      : error
+                        ? 'Requests could not be loaded'
+                        : 'Loading requests...'}
                   </span>
                   <button
                     type="button"
-                    onClick={reload}
-                    disabled={loading}
-                    className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-gray-400 transition-colors hover:text-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 disabled:opacity-60"
+                    onClick={() => !loading && reload()}
+                    aria-disabled={loading || undefined}
+                    className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-gray-400 transition-colors hover:text-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 aria-disabled:opacity-60 aria-disabled:hover:text-gray-400"
                   >
                     {loading ? (
                       <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -396,10 +406,10 @@ const AdminDashboard = ({ api, onLogout }) => {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={page <= 1 || loading}
+                        onClick={() => !loading && page > 1 && setPage(page - 1)}
+                        aria-disabled={page <= 1 || loading || undefined}
                         aria-label="Previous page"
-                        className="rounded-lg border border-gray-700 p-2 text-white transition-colors hover:border-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 disabled:cursor-not-allowed disabled:opacity-40"
+                        className={pageButtonClass}
                       >
                         <ChevronLeft size={16} aria-hidden="true" />
                       </button>
@@ -408,10 +418,10 @@ const AdminDashboard = ({ api, onLogout }) => {
                       </span>
                       <button
                         type="button"
-                        onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                        disabled={page >= pageCount || loading}
+                        onClick={() => !loading && page < pageCount && setPage(page + 1)}
+                        aria-disabled={page >= pageCount || loading || undefined}
                         aria-label="Next page"
-                        className="rounded-lg border border-gray-700 p-2 text-white transition-colors hover:border-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 disabled:cursor-not-allowed disabled:opacity-40"
+                        className={pageButtonClass}
                       >
                         <ChevronRight size={16} aria-hidden="true" />
                       </button>
@@ -431,7 +441,7 @@ const AdminDashboard = ({ api, onLogout }) => {
           request={selected}
           open={detailOpen}
           onOpenChange={setDetailOpen}
-          emailEnabled={notifications ? Boolean(notifications.email) : true}
+          emailEnabled={notifications ? Boolean(notifications.client_email ?? notifications.email) : true}
           onUpdated={reload}
           onDeleted={handleDeleted}
         />

@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { Mail, MapPin, Phone, Github, Linkedin, Twitter, Loader2 } from 'lucide-react';
 import { personalInfo } from '../data/mock';
+import ErrorBoundary from './ErrorBoundary';
 
 const RequestForm = lazy(() => import('./RequestForm'));
 
@@ -27,7 +28,7 @@ const Contact = () => {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-5 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
           <div className="lg:col-span-2 space-y-8">
             <div>
               <h3 className="text-2xl font-bold text-white mb-6">Contact Information</h3>
@@ -107,9 +108,15 @@ const Contact = () => {
             id="contact-form"
             className="lg:col-span-3 scroll-mt-24 bg-[#0a0a0a] rounded-xl p-5 sm:p-8 border border-gray-800"
           >
-            <Suspense fallback={<FormFallback />}>
-              <RequestForm />
-            </Suspense>
+            <ErrorBoundary
+              className="min-h-[420px]"
+              title="The contact form could not be loaded."
+              description={`The site may have been updated since you opened this page. Reload it, or email me at ${personalInfo.email}.`}
+            >
+              <Suspense fallback={<FormFallback />}>
+                <RequestForm />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       </div>

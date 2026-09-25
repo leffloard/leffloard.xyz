@@ -57,11 +57,14 @@ const ACTIONS = {
   },
 };
 
+// Emailing the client can take a while; the server gives up after 25 seconds, so wait longer than that.
+const UPDATE_TIMEOUT_MS = 45000;
+
 const buttonBase =
-  'inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
 
 const textareaClass =
-  'border-gray-800 bg-[#0a0a0a] text-white placeholder:text-gray-600 focus-visible:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-400/30 aria-[invalid=true]:border-red-500/70';
+  'border-gray-800 bg-[#0a0a0a] text-white placeholder:text-gray-500 focus-visible:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-400/30 aria-[invalid=true]:border-red-500/70';
 
 function initialSchedule(doc) {
   if (doc?.type !== 'appointment') return '';
@@ -82,7 +85,7 @@ function Detail({ label, children, className }) {
   return (
     <div className={className}>
       <dt className="font-mono text-xs uppercase tracking-wider text-gray-500">{label}</dt>
-      <dd className="mt-1 break-words text-sm text-gray-200">{children}</dd>
+      <dd className="mt-1 text-sm text-gray-200 [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
@@ -114,6 +117,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
   const [fieldErrors, setFieldErrors] = useState({});
   const [busy, setBusy] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -133,7 +137,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
         }
       });
     return () => controller.abort();
-  }, [api, request, onDeleted]);
+  }, [api, request, onDeleted, reloadKey]);
 
   const isAppointment = doc.type === 'appointment';
   const adminZone = browserTimeZone();
@@ -175,6 +179,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
   };
 
   const submit = async (nextStatus) => {
+    if (busy) return;
     const { body, errors } = buildBody(nextStatus);
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
@@ -187,7 +192,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
     }
     setBusy(nextStatus || 'save');
     try {
-      const { data } = await api.patch(`/requests/${encodeURIComponent(doc.id)}`, body);
+      const { data } = await api.patch(`/requests/${encodeURIComponent(doc.id)}`, body, { timeout: UPDATE_TIMEOUT_MS });
       const updated = data?.id ? data : { ...doc, ...body };
       setDoc(updated);
       setAdminNote(updated.admin_note || '');
@@ -206,7 +211,18 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
       onUpdated();
     } catch (err) {
       if (isHandledStatus(err)) return;
-      const status = err.response?.status;
+      if (!err.response) {
+        toast({
+          variant: 'destructive',
+          title: 'Update not confirmed',
+          description:
+            'The server did not answer in time, so the change may or may not have been saved. The request was reloaded; check it before trying again.',
+        });
+        setReloadKey((key) => key + 1);
+        onUpdated();
+        return;
+      }
+      const status = err.response.status;
       if (status === 404) {
         toast({ variant: 'destructive', title: 'Request not found', description: 'It may have been deleted.' });
         onDeleted();
@@ -262,7 +278,8 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
   };
 
   const history = Array.isArray(doc.history) ? doc.history : [];
-  const mailto = `mailto:${doc.email}?subject=${encodeURIComponent(`Re: ${doc.subject || 'your request'}`)}`;
+  const mailAddress = encodeURIComponent(doc.email).replace(/%40/g, '@');
+  const mailto = `mailto:${mailAddress}?subject=${encodeURIComponent(`Re: ${doc.subject || 'your request'}`)}`;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -282,15 +299,15 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
         </SheetHeader>
 
         <div className="flex-1 space-y-8 overflow-y-auto p-5 sm:p-6">
-          <dl className="grid gap-5 sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Detail label="Name">{doc.name}</Detail>
             <Detail label="Email">
               <a href={mailto} className="text-cyan-400 underline-offset-4 hover:underline">
                 {doc.email}
               </a>
             </Detail>
-            <Detail label="Discord / Telegram">{doc.contact_handle || <span className="text-gray-600">-</span>}</Detail>
-            <Detail label="Service">{doc.service || <span className="text-gray-600">-</span>}</Detail>
+            <Detail label="Discord / Telegram">{doc.contact_handle || <span className="text-gray-500">-</span>}</Detail>
+            <Detail label="Service">{doc.service || <span className="text-gray-500">-</span>}</Detail>
             {doc.type === 'revision' && (
               <Detail label="Project reference" className="sm:col-span-2">
                 {doc.project_reference}
@@ -383,7 +400,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
 
             <div>
               <Label htmlFor="detail-note" className="mb-2 block text-sm text-gray-400">
-                Admin note <span className="text-xs text-gray-600">(only visible here)</span>
+                Admin note <span className="text-xs text-gray-400">(only visible here)</span>
               </Label>
               <Textarea
                 id="detail-note"
@@ -413,7 +430,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
                   </Label>
                   <p id="detail-notify-hint" className="mt-1 text-xs text-gray-500">
                     {emailEnabled
-                      ? `Sent to ${doc.email} with the new status${isAppointment ? ' and scheduled time' : ''}.`
+                      ? `Sent to ${doc.email} with the new status${isAppointment ? ', plus the scheduled time when you confirm' : ''}.`
                       : 'Email is not configured on the server, so the client cannot be emailed.'}
                   </p>
                 </div>
@@ -421,7 +438,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
               {notifyClient && (
                 <div className="mt-4">
                   <Label htmlFor="detail-client-message" className="mb-2 block text-sm text-gray-400">
-                    Message to the client <span className="text-xs text-gray-600">(optional)</span>
+                    Message to the client <span className="text-xs text-gray-400">(optional)</span>
                   </Label>
                   <Textarea
                     id="detail-client-message"
@@ -449,7 +466,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
                   key={status}
                   type="button"
                   onClick={() => submit(status)}
-                  disabled={Boolean(busy)}
+                  aria-disabled={busy ? true : undefined}
                   className={cn(buttonBase, action.className)}
                 >
                   {busy === status ? (
@@ -464,7 +481,7 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
           <button
             type="button"
             onClick={() => submit(null)}
-            disabled={Boolean(busy)}
+            aria-disabled={busy ? true : undefined}
             className={cn(buttonBase, 'border border-gray-700 text-white hover:border-cyan-400 hover:text-cyan-400')}
           >
             {busy === 'save' ? (
@@ -476,8 +493,8 @@ const RequestDetailSheet = ({ api, request, open, onOpenChange, emailEnabled, on
           </button>
           <button
             type="button"
-            onClick={() => setConfirmDelete(true)}
-            disabled={Boolean(busy)}
+            onClick={() => !busy && setConfirmDelete(true)}
+            aria-disabled={busy ? true : undefined}
             className={cn(buttonBase, 'ml-auto text-red-400 hover:bg-red-500/10 hover:text-red-300')}
           >
             <Trash2 size={14} aria-hidden="true" />

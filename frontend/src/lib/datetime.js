@@ -29,7 +29,9 @@ export const TIME_SLOTS = Array.from({ length: 29 }, (_, i) => {
 
 export function browserTimeZone() {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // ICU reports Etc/Unknown when it cannot map the system zone; the API only accepts real IANA names.
+    return zone && zone !== 'Etc/Unknown' ? zone : 'UTC';
   } catch {
     return 'UTC';
   }
