@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import mimetypes
 import re
 import uuid
 from contextlib import asynccontextmanager
@@ -31,6 +32,9 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+# httpx logs every request URL at INFO, and the Discord webhook URL contains its secret token.
+for noisy_logger in ("httpx", "httpcore"):
+    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 settings = load_settings()
@@ -68,6 +72,8 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Discord notifications: %s", "enabled" if settings.discord_enabled else "disabled")
     logger.info("Email notifications: %s", "enabled" if settings.owner_email_enabled else "disabled")
+    if settings.trusted_proxies:
+        logger.info("Rate limiting trusts the last %d X-Forwarded-For entries (TRUST_PROXY).", settings.trusted_proxies)
     try:
         await db.requests.create_index("id", unique=True)
         await db.requests.create_index("status")
@@ -149,7 +155,7 @@ async def create_request(request: Request, background_tasks: BackgroundTasks, pa
     except ValidationError as exc:
         raise RequestValidationError(exc.errors()) from None
 
-    retry_after = submission_limiter.hit(security.client_ip(request, settings.trust_proxy))
+    retry_after = submission_limiter.hit(security.client_key(request, settings.trusted_proxies))
     if retry_after:
         raise HTTPException(
             status_code=429,
@@ -175,8 +181,8 @@ async def create_request(request: Request, background_tasks: BackgroundTasks, pa
 
 @api_router.post("/admin/login", dependencies=[Depends(require_admin_configured)])
 async def admin_login(request: Request, body: LoginBody):
-    ip = security.client_ip(request, settings.trust_proxy)
-    retry_after = login_limiter.hit(ip)
+    client_key = security.client_key(request, settings.trusted_proxies)
+    retry_after = login_limiter.hit(client_key)
     if retry_after:
         raise HTTPException(
             status_code=429,
@@ -185,14 +191,20 @@ async def admin_login(request: Request, body: LoginBody):
         )
     if not await asyncio.to_thread(security.password_matches, body.password, settings.admin_password_hash):
         raise HTTPException(status_code=401, detail="Incorrect password.")
-    login_limiter.release(ip)
+    login_limiter.release(client_key)
     token, expires_at = security.issue_token(settings.admin_jwt_secret)
     return {"token": token, "expires_at": expires_at.isoformat()}
 
 
 @admin_router.get("/me")
 async def admin_me():
-    return {"notifications": {"discord": settings.discord_enabled, "email": settings.owner_email_enabled}}
+    return {
+        "notifications": {
+            "discord": settings.discord_enabled,
+            "email": settings.owner_email_enabled,
+            "client_email": settings.smtp_enabled,
+        }
+    }
 
 
 @admin_router.get("/requests")
@@ -287,6 +299,13 @@ app.include_router(api_router)
 app.include_router(admin_router)
 
 
+def register_frontend_types() -> None:
+    """Pins the types browsers insist on; on Windows mimetypes reads the registry, which may map .js to text/plain."""
+    mimetypes.add_type("text/javascript", ".js")
+    mimetypes.add_type("text/javascript", ".mjs")
+    mimetypes.add_type("text/css", ".css")
+
+
 class FrontendFiles(StaticFiles):
     """Serves the built frontend, answering unknown paths with index.html so client-side routes survive a reload."""
 
@@ -308,6 +327,7 @@ class FrontendFiles(StaticFiles):
 
 
 if (settings.frontend_dist / "index.html").is_file():
+    register_frontend_types()
     app.mount("/", FrontendFiles(directory=settings.frontend_dist), name="frontend")
     logger.info("Serving the frontend from %s", settings.frontend_dist)
 else:

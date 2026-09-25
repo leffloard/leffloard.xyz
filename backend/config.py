@@ -11,6 +11,7 @@ MIN_JWT_SECRET_LENGTH = 32
 DEFAULT_MONGO_URL = "mongodb://localhost:27017"
 DEFAULT_DB_NAME = "leffloard"
 BCRYPT_HASH_PATTERN = re.compile(r"^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$")
+MAX_TRUSTED_PROXIES = 5
 
 
 def _env(name: str) -> str:
@@ -33,7 +34,7 @@ class Settings:
     smtp_from: str = ""
     smtp_security: str = "starttls"
     notify_email_to: str = ""
-    trust_proxy: bool = False
+    trusted_proxies: int = 0
     frontend_dist: Path = ROOT_DIR.parent / "frontend" / "dist"
     problems: tuple[str, ...] = field(default=(), compare=False)
 
@@ -52,6 +53,21 @@ class Settings:
     @property
     def owner_email_enabled(self) -> bool:
         return self.smtp_enabled and bool(self.notify_email_to)
+
+
+def _trusted_proxies(value: str, problems: list[str]) -> int:
+    value = value.lower()
+    if value in ("", "0", "false", "no", "off"):
+        return 0
+    if value in ("true", "yes", "on"):
+        return 1
+    if value.isdigit() and int(value) <= MAX_TRUSTED_PROXIES:
+        return int(value)
+    problems.append(
+        f"TRUST_PROXY must be 0 or the number of proxies in front of the app (1-{MAX_TRUSTED_PROXIES}). "
+        "Rate limiting uses the connecting address."
+    )
+    return 0
 
 
 def load_settings() -> Settings:
@@ -105,6 +121,8 @@ def load_settings() -> Settings:
     if site_url and not site_url.startswith(("http://", "https://")):
         site_url = f"https://{site_url}"
 
+    trusted_proxies = _trusted_proxies(_env("TRUST_PROXY"), problems)
+
     frontend_dist = Path(_env("FRONTEND_DIST") or ROOT_DIR.parent / "frontend" / "dist")
     if not frontend_dist.is_absolute():
         frontend_dist = ROOT_DIR / frontend_dist
@@ -124,7 +142,7 @@ def load_settings() -> Settings:
         smtp_from=smtp_from,
         smtp_security=smtp_security,
         notify_email_to=_env("NOTIFY_EMAIL_TO"),
-        trust_proxy=_env("TRUST_PROXY").lower() in ("1", "true", "yes", "on"),
+        trusted_proxies=trusted_proxies,
         frontend_dist=frontend_dist.resolve(),
         problems=tuple(problems),
     )

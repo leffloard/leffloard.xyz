@@ -63,12 +63,7 @@ leffloard.xyz/
 
 ## Getting Started
 
-### Quick Start (Windows)
-To start both the frontend and backend development servers concurrently, execute the provided batch script in the root directory:
-```cmd
-egefitnessalwaysinbussinies.bat
-```
-This script opens a new command prompt window to host the FastAPI uvicorn server, and runs the Vite development server in the current terminal window.
+Follow the [Manual Installation](#manual-installation) steps once to install the dependencies and create `backend/.env`. After that, the [development shortcut](#development-shortcut-windows) can start both servers on Windows.
 
 ---
 
@@ -161,6 +156,13 @@ The tests use an in-memory MongoDB replacement and mocked Discord/SMTP senders, 
    ```
    The frontend interface will be available at `http://localhost:5173`. Requests to `/api` are proxied to the backend at `http://127.0.0.1:8000`, so start the backend first to use the contact form and `/admin`.
 
+### Development shortcut (Windows)
+`egefitnessalwaysinbussinies.bat` in the root directory opens a new command prompt window running the FastAPI server with `--reload` and runs the Vite development server in the current window:
+```cmd
+egefitnessalwaysinbussinies.bat
+```
+It is the author's own shortcut: it expects the project at `C:\Users\Leff\Desktop\leffloard.xyz` and uses the global `python`, so edit the paths (for example to `backend\venv\Scripts\python.exe`) if your setup differs. It starts development servers only; see [Deployment](#deployment) for running the site in production.
+
 ---
 
 ## API Endpoints
@@ -172,7 +174,7 @@ All endpoints live under `/api` and exchange JSON. Interactive documentation is 
 | **GET** | `/api/health` | Public | Health check, returns `{"ok": true}`. |
 | **POST** | `/api/requests` | Public | Submits an appointment, revision or general inquiry request. |
 | **POST** | `/api/admin/login` | Public | Exchanges the admin password for a bearer token valid for 12 hours. |
-| **GET** | `/api/admin/me` | Admin | Reports which notification channels (`discord`, `email`) are configured. |
+| **GET** | `/api/admin/me` | Admin | Reports which notification channels are configured: `discord`, `email` (new-request emails to you) and `client_email` (status emails to clients, which only need the SMTP settings). |
 | **GET** | `/api/admin/requests` | Admin | Lists requests, newest first. Query: `status`, `type`, `q` (searches name, email, subject and project reference), `page`, `limit` (max 100). Returns `items`, `total` and per-status `counts`. |
 | **GET** | `/api/admin/requests/{id}` | Admin | Returns one request. |
 | **PATCH** | `/api/admin/requests/{id}` | Admin | Updates `status`, `admin_note` or `scheduled_at` (appointments only, ISO 8601 with offset). With `notify_client: true` and an optional `client_message`, emails the client; the response includes `client_notified`. |
@@ -202,7 +204,7 @@ Text is trimmed and control characters are rejected. Scheduling fields are ignor
 
 - `201` returns `{"id", "status": "new", "created_at"}`.
 - `422` returns `{"detail": [{"field": "...", "message": "..."}]}` so the form can show each message next to its field.
-- `429` is returned after 5 accepted submissions from the same IP address within 10 minutes. Admin login allows 5 failed attempts per IP address per 15 minutes.
+- `429` is returned after 5 accepted submissions from the same IP address within 10 minutes. Admin login allows 5 failed attempts per IP address per 15 minutes. IPv6 addresses count per `/64` network, and behind a proxy see [`TRUST_PROXY`](#https-with-a-reverse-proxy-or-cloudflare-tunnel).
 
 Request statuses are `new`, `confirmed`, `declined` and `completed`; every status change is recorded in the request's `history`.
 
@@ -236,15 +238,39 @@ One Python process serves both the API and the built website, which suits a sing
    ```
    FastAPI serves `frontend/dist` automatically and answers client-side routes such as `/pricing`, `/blog/1` and `/admin` with `index.html`. Set `FRONTEND_DIST` if the build lives elsewhere. Unknown `/api/...` paths still return JSON `404` responses.
 2. Configure `backend/.env` as described in [Backend Setup](#backend-setup), including `SITE_URL`. Leave `CORS_ORIGINS` empty, because the site and the API share one origin.
-3. Start the server from the `backend` directory, without `--reload`:
+3. Start the server without `--reload`. From the `backend` directory, with the virtual environment activated:
    ```bash
    python -m uvicorn server:app --host 0.0.0.0 --port 8000
    ```
    The whole site is now available on port 8000. Open the port in the firewall if visitors connect to it directly.
-4. Keep it running after reboots: on Windows, create a Task Scheduler task that runs the command above at startup (or wrap it as a service with a tool such as NSSM); on Linux, use a systemd service.
+4. Keep it running after reboots. A startup task or service neither starts in the `backend` directory nor activates the virtual environment, so give it full paths. The examples assume the project lives in `C:\leffloard.xyz`:
+   - **Task Scheduler (Windows):** *Create Task*, choose *Run whether user is logged on or not*, add the trigger *At startup* and the action *Start a program* with:
+     - Program/script: `C:\leffloard.xyz\backend\venv\Scripts\python.exe`
+     - Add arguments: `-m uvicorn server:app --app-dir C:\leffloard.xyz\backend --host 0.0.0.0 --port 8000`
+     - Start in: `C:\leffloard.xyz\backend`
+
+     On the *Settings* tab, clear *Stop the task if it runs longer than*.
+   - **NSSM (Windows service):**
+     ```cmd
+     nssm install leffloard C:\leffloard.xyz\backend\venv\Scripts\python.exe -m uvicorn server:app --app-dir C:\leffloard.xyz\backend --host 0.0.0.0 --port 8000
+     nssm set leffloard AppDirectory C:\leffloard.xyz\backend
+     nssm start leffloard
+     ```
+   - **systemd (Linux):** set `WorkingDirectory=/path/to/leffloard.xyz/backend` and `ExecStart=/path/to/leffloard.xyz/backend/venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8000`.
 
 #### HTTPS with a reverse proxy or Cloudflare Tunnel
-For HTTPS on your own domain, run uvicorn on `--host 127.0.0.1` and put a reverse proxy (Caddy, nginx or IIS) or a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) in front of it, pointing to `http://127.0.0.1:8000`. A tunnel needs no open inbound ports. In this setup set `TRUST_PROXY=1` so rate limiting uses the visitor's address from `X-Forwarded-For`. Keep `TRUST_PROXY=0` when uvicorn is reachable directly, otherwise visitors could spoof that header.
+For HTTPS on your own domain, run uvicorn on `--host 127.0.0.1` and put a reverse proxy (Caddy, nginx or IIS) or a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) in front of it, pointing to `http://127.0.0.1:8000` (use `127.0.0.1`, not `localhost`). A tunnel needs no open inbound ports.
+
+Rate limiting counts requests per visitor address. Proxies add the address they received a request from to the end of the `X-Forwarded-For` header, after anything the visitor sent, so only the entries added by your own proxies can be trusted. `TRUST_PROXY` is the number of proxies between the visitor and uvicorn. A single proxy or tunnel on the same machine needs no setting, because uvicorn already reads the header on connections from `127.0.0.1` or `::1`:
+
+| Setup | `TRUST_PROXY` |
+| :--- | :--- |
+| Visitors connect to uvicorn directly | `0` |
+| A proxy or tunnel on the same machine (Caddy, nginx, IIS, `cloudflared`) connects to `127.0.0.1` | `0` |
+| Cloudflare's proxy (orange cloud) or another proxy on a different machine connects to uvicorn | `1` |
+| Cloudflare's proxy (orange cloud) in front of nginx or IIS on the same machine | `2` |
+
+Never set a number higher than the real number of proxies, and with `1` or more make sure visitors cannot bypass the proxy (for Cloudflare, only allow [Cloudflare's IP ranges](https://www.cloudflare.com/ips/) through the firewall); otherwise a visitor can choose the address the rate limiter sees. Never start uvicorn with `--forwarded-allow-ips="*"` for the same reason. The startup log mentions the setting when it is not `0`.
 
 ### Split hosting
 The frontend can also be hosted as static files (Netlify, Vercel, GitHub Pages) with the API on a separate server:

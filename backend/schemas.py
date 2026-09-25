@@ -19,6 +19,9 @@ MAX_DAYS_AHEAD = 120
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_PATTERN = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 NON_IANA_ZONES = {"localtime", "Factory"}
+# Unicode line and paragraph separators are not control characters, but email headers treat them as line breaks.
+LINE_SEPARATORS = str.maketrans({"\u2028": "\n", "\u2029": "\n"})
+SPACE_SEPARATORS = str.maketrans({"\u2028": " ", "\u2029": " "})
 
 BODY_MESSAGES = {
     "json_invalid": "The request body must be valid JSON.",
@@ -58,7 +61,9 @@ def clean_text(
     if not isinstance(value, str):
         raise invalid("Must be text.")
     if multiline:
-        value = value.replace("\r\n", "\n").replace("\r", "\n")
+        value = value.replace("\r\n", "\n").replace("\r", "\n").translate(LINE_SEPARATORS)
+    else:
+        value = value.translate(SPACE_SEPARATORS)
     value = value.strip()
     if not value:
         if required:
