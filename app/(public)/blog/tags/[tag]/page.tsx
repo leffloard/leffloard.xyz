@@ -2,13 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PostList } from "@/components/site/post-list";
 import { PageIntro, Section } from "@/components/site/section";
-import { listPosts, listTags } from "@/server/content/posts";
-
-export const dynamicParams = false;
-
-export async function generateStaticParams() {
-  return (await listTags()).map(({ tag }) => ({ tag }));
-}
+import { pageContent } from "@/server/content/site";
 
 export async function generateMetadata({ params }: { params: Promise<{ tag: string }> }): Promise<Metadata> {
   const { tag } = await params;
@@ -17,7 +11,7 @@ export async function generateMetadata({ params }: { params: Promise<{ tag: stri
 
 export default async function TagPage({ params }: { params: Promise<{ tag: string }> }) {
   const { tag } = await params;
-  const posts = (await listPosts()).filter((post) => post.tags.includes(tag));
+  const posts = (await pageContent()).posts.filter((post) => post.tags.includes(tag));
   if (posts.length === 0) notFound();
   return (
     <>

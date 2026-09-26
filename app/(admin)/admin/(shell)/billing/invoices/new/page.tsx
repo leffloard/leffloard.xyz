@@ -61,7 +61,7 @@ export default async function NewInvoicePage({
         })}
         clients={clients}
         projects={projects}
-        catalog={serviceCatalog()}
+        catalog={await serviceCatalog()}
         cryptoReady={available.crypto}
       />
     </>

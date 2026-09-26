@@ -21,7 +21,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /(admin-(inbox|settings|work)|calendar|billing|portal)\.spec\.ts/,
+      testIgnore: /(admin-(inbox|settings|work)|calendar|billing|portal|content)\.spec\.ts/,
       use: chromium,
     },
     {
@@ -58,6 +58,13 @@ export default defineConfig({
       name: "portal",
       testMatch: /portal\.spec\.ts/,
       dependencies: ["billing"],
+      use: chromium,
+    },
+    {
+      // The content editor: last, as it changes what the public pages show.
+      name: "content",
+      testMatch: /content\.spec\.ts/,
+      dependencies: ["portal"],
       use: chromium,
     },
   ],

@@ -1,6 +1,6 @@
 import { formatPrice } from "@/components/site/service-card";
 import { cn } from "@/components/ui/cn";
-import type { Package } from "@/content/services";
+import type { Package } from "@/lib/content/types";
 
 export function PackageCard({ item }: { item: Package }) {
   return (

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Availability } from "@/components/site/availability";
 import { LogoMark } from "@/components/site/logo";
 import { navigation, site } from "@/content/site";
+import { pageContent } from "@/server/content/site";
 
 const LEGAL = [
   { href: "/legal/privacy", label: "Privacy" },
@@ -10,7 +11,8 @@ const LEGAL = [
   { href: "/colophon", label: "Colophon" },
 ];
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const { profile } = await pageContent();
   return (
     <footer className="relative border-t border-line">
       <span aria-hidden className="crosshair top-0 left-0" />
@@ -21,7 +23,7 @@ export function SiteFooter() {
             <LogoMark />
             <span className="text-[15px] font-semibold tracking-tight">leffloard</span>
           </Link>
-          <p className="mt-4 max-w-sm text-sm text-muted">{site.pitch}</p>
+          <p className="mt-4 max-w-sm text-sm text-muted">{profile.pitch}</p>
           <Availability className="mt-5" />
         </div>
         <nav aria-label="Footer" className="md:col-span-3">

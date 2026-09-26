@@ -4,16 +4,11 @@ import { notFound } from "next/navigation";
 import { CtaBand } from "@/components/site/cta-band";
 import { Arrow } from "@/components/site/link-button";
 import { site } from "@/content/site";
-import { formatPostDate, getPost, listPosts } from "@/server/content/posts";
-
-export const dynamicParams = false;
-
-export async function generateStaticParams() {
-  return (await listPosts()).map((post) => ({ slug: post.slug }));
-}
+import { findPost, formatPostDate } from "@/lib/content/types";
+import { pageContent } from "@/server/content/site";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const post = await getPost((await params).slug);
+  const post = findPost(await pageContent(), (await params).slug);
   if (!post) return {};
   return {
     title: post.title,
@@ -32,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
-  const post = await getPost((await params).slug);
+  const post = findPost(await pageContent(), (await params).slug);
   if (!post) notFound();
   const jsonLd = {
     "@context": "https://schema.org",

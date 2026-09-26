@@ -5,8 +5,9 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M8, the client portal: sign-in by emailed link,
-projects with their updates and deliverables, revision requests, invoices, calls and data requests**.
+This document grows with each milestone. Current state: **M9, the content editor: the public site's content
+in the database with drafts, previews, scheduled publishing, versions and a leak check; the media library;
+the GitHub sync**.
 
 ## Layout
 
@@ -20,12 +21,15 @@ app/                      Routes (App Router)
     pay/return/           Where NOWPayments sends the client back after paying
     portal/               The client portal: sign-in and its link's page, projects, invoices and quotes, calls,
                           account
+  media/[file]/           Images from the media library (/media/<sha256>.webp)
   sitemap.ts, robots.ts   Machine-readable files (plus manifest.ts and .well-known/security.txt)
   (admin)/admin/          Admin, with its own root layout (dynamic, noindex)
     login/, setup/        Sign-in, two-step check, first-time authenticator setup
+    preview/, media/      Starting the owner's preview of drafts; uploading an image
     (shell)/              Signed-in pages: Today, Inbox, Calendar, Tasks, Projects, Clients, Billing (quotes,
                           invoices, recurring, payments, settings), Finance (overview, expenses, rates,
-                          export), Time, Security, Settings
+                          export), Time, Content (work, blog, services, testimonials, profile, CV,
+                          pricing terms, media, GitHub, leak check), Security, Settings
   api/inquiries/route.ts  The contact form's endpoint
   api/bookings/           Booking a call, and the open times of a booking type
   api/meetings/[token]/   The guest's link: open times, reschedule, cancel
@@ -35,6 +39,7 @@ app/                      Routes (App Router)
   api/payments/nowpayments/  NOWPayments' payment callbacks (IPN)
   api/portal/             The portal: asking for a sign-in link, signing in with it, signing out, revision
                           and data requests
+  api/preview/exit/       Ends the owner's preview of drafts
   api/requests/route.ts   The v1 form API, same contract as v1 (kept until the legacy code is removed)
   api/[[...path]]/        JSON 404 for unknown API addresses
   api/health/route.ts     Health check (shallow and deep)
@@ -42,7 +47,8 @@ app/                      Routes (App Router)
   global-not-found.tsx    404 page for every unmatched address
   globals.css             Tailwind 4 entry and design tokens
 components/               UI: ui/ (buttons, fields, cards), site/ (public site) and admin/
-content/                  Public site content until the CMS (M9): site facts, work, services, CV, blog posts
+content/                  The content a new database starts with (site facts, work, services, CV, blog posts);
+                          after that, the database is the only source
 lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, CSP builder, formatting, money
                           (integer minor units), ranks for ordered lists, durations, admin form schemas
   intake/                 The form rules shared by browser and server (ported from the v1 backend)
@@ -53,6 +59,8 @@ lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, C
                           words; IBAN checks; the billing forms; recurring dates and periods
   finance/                TCMB bulletins and exact conversions, expense categories, receivables' ages, CSV
   portal/                 The portal's form rules
+  content/                The content's schemas (one per kind), the editor's field lists, the public types,
+                          and the leak check
 server/                   Server-only code (every file imports "server-only")
   env.ts                  Validated configuration, plain-English errors
   boot.ts                 Runs once at start-up (via instrumentation.ts); stops on bad config
@@ -61,7 +69,9 @@ server/                   Server-only code (every file imports "server-only")
   health.ts               Deep health logic and constant-time token check
   http.ts                 Size-limited request body reading
   auth/                   Owner account, sessions, sign-in steps, passkeys, audit log, admin action wrapper
-  content/                Blog rendering (Markdown pipeline), OG image and CV PDF generation
+  content/                The site's content: the seed, the snapshot public pages read, the editor's
+                          changes, Markdown rendering, previews, the media library, the GitHub sync, OG
+                          images and the CV PDF
   security/               Password hashing, encryption, rate limits, lockouts, Turnstile, Access, CSRF, NoSQL guard,
                           idempotency keys
   inquiries/              The inbox: storing, listing and changing messages, the blocklist, the v1 data copy
@@ -104,9 +114,10 @@ next.config.ts            Standalone output, security headers
 
 ## Request flow
 
-1. `proxy.ts` gives each request an `x-request-id` and its Content Security Policy. Pages rendered per request
-   (admin, and later the portal and link pages) get a fresh nonce.
-2. The page or route handler runs. Public pages are prerendered at build time; admin pages are dynamic.
+1. `proxy.ts` gives each request an `x-request-id` and its Content Security Policy, with a fresh nonce for
+   every address under the site's pages. Media library images skip the proxy and keep their own headers.
+2. The page or route handler runs. Every page renders per request: public pages from the content snapshot
+   (see Content editor), the admin, the portal and the link pages from the database.
 3. Authorization happens inside each page, route handler and server action, through the data access layer
    (`server/auth/dal.ts`). The proxy is not a security boundary: a request that skips it gains nothing.
 
@@ -184,17 +195,18 @@ enforced on the server and covered by unit, integration and browser tests.
 
 ### Content Security Policy and headers
 
-Admin pages get `script-src 'self' 'nonce-…' 'strict-dynamic'` with a new nonce per request: an injected
-script cannot run. Prerendered public pages cannot carry a nonce, so they allow inline scripts but no script
-from anywhere except this site and Turnstile. Both policies forbid framing, plugins and `<base>`, and report
-violations to `/api/csp-report` (size-limited, rate-limited, stored for 30 days without link tokens). The
-browser tests fail on any CSP violation.
+Every page the app renders gets `script-src 'self' 'nonce-…' 'strict-dynamic'` with a new nonce per request
+(since M9 the public pages too, and the 404 page, which renders per request to carry it): an injected script
+cannot run. An address outside the site's page sections gets a policy without a nonce, which allows inline
+scripts but no script from anywhere except this site and Turnstile. Both policies forbid framing, plugins and `<base>`, and report violations to
+`/api/csp-report` (size-limited, rate-limited, stored for 30 days without link tokens). The browser tests
+fail on any CSP violation.
 
 `next.config.ts` also sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
 `Referrer-Policy: strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy: same-origin`,
 `Cross-Origin-Resource-Policy: same-origin`, a `Permissions-Policy` that turns off camera, microphone,
 location, payment, USB and topics, and HSTS in production. `X-Powered-By` is off; admin pages add
-`X-Robots-Tag: noindex, nofollow`.
+`X-Robots-Tag: noindex, nofollow` (so do the portal and the link pages).
 
 ### Recovery
 
@@ -210,20 +222,22 @@ location, payment, USB and topics, and HSTS in production. `X-Powered-By` is off
 
 ### Content
 
-Until the CMS arrives (M9), the public site's content lives in `content/`: `site.ts` (contact details,
-availability), `work.ts` (portfolio), `services.ts` (packages, prices, terms), `cv.ts` and `blog/*.md`.
-Everything is generated at build time; no public page touches the database.
+The public site's content lives in the database and is edited in the admin (see Content editor below).
+`content/` holds what a new database starts with: `site.ts` (contact details and the first profile),
+`work.ts` (portfolio), `services.ts` (packages, prices, terms), `cv.ts` and `blog/*.md`. Name, email,
+location and addresses stay in `content/site.ts`, as they are used by emails and invoices too.
 
-The content follows fixed rules, checked by `tests/unit/content.test.ts` on every change:
+The content follows fixed rules, checked on the seed by `tests/unit/content.test.ts` and on every publication
+by the leak check:
 
 - Only verifiable facts. Private projects are described from a facts sheet (purpose, capabilities,
   architecture, practices, stack) and never link to their code; public repositories do.
 - No phone numbers, template leftovers, Discord ids, webhook URLs or keys anywhere in `content/`.
 - No case studies, marketing copy or pricing for game-modification projects or cheat loaders.
 
-Blog posts are Markdown with a small frontmatter (`title`, `description`, `date`, `tags`). They are
-rendered with remark and rehype, sanitised (scripts, event handlers, `javascript:` links and iframes are
-removed), then highlighted by Shiki in both a light and a dark theme.
+Posts and case studies are Markdown, rendered when they are saved: remark and rehype, sanitised (scripts,
+event handlers, `javascript:` links, iframes and every image not from the media library are removed), then
+highlighted by Shiki in a light and a dark theme. The stored HTML is what pages show.
 
 ### Design system
 
@@ -518,6 +532,59 @@ page and endpoint reaches data through `requirePortalClient()` (`server/portal/d
   outbox with a `dedupeKey`. The portal's pages are dynamic, noindex, under the nonce CSP, and `robots.txt` keeps crawlers
   out.
 
+## Content editor
+
+What the public site shows (M9), edited in the admin's Content section. `lib/content` holds the pure parts
+(schemas, field lists, the leak check); `server/content` is the only code that touches the content
+collections.
+
+- **Drafts and published copies.** Every item (a case study, post, service or testimonial; the profile, the
+  CV and the pricing terms) is one document in `content` with a `draft` the editor saves and a `published`
+  copy the site shows. A save checks the draft with the same zod schema as the form, renders its Markdown and
+  carries a `version`, so a save from an older tab is refused. Addresses (slugs) are unique per kind among
+  drafts and published copies (the second by a unique index).
+- **Publishing** checks the draft first (the leak check, and a testimonial's recorded permission), then, in
+  one transaction, copies it over the published copy, keeps the replaced copy in `content_versions` and raises
+  the content's generation. A version can be brought back into the draft; it is checked by today's rules and
+  rendered again like any draft. A case study is cut into its numbered sections in the rendered tree, never
+  in the HTML text. Taking an item off the site keeps
+  its draft and a version; deleting it removes its versions too. The site's order follows the items' ranks.
+- **Scheduled publishing.** A draft can be given a moment to go live; the `content-publish` job checks every
+  minute, claims each due item first (so two processes never publish it twice) and runs the same checks. A
+  draft that fails them is not published: the schedule is cleared and the owner told by email and Discord. An
+  error on the way (the database) puts the schedule back, to be tried again.
+- **The leak check** (`lib/content/leaks.ts`) looks at every published field of the draft as written and at
+  the rendered HTML with its character references decoded (so `&#64;` hides nothing), never the private note
+  about a testimonial's permission, for Discord webhooks and ids, database addresses with a password,
+  private keys, API keys and tokens, secrets from settings files, IP addresses (except loopback and
+  documentation ranges), email addresses other than the owner's, phone numbers, and the owner's own list of
+  words (Content → Leak check). Anything found stops the publication and is listed, shortened so no secret is
+  shown in full. There is no override: the text is changed instead. A repository is checked before it is
+  shown on the work page, and Content → Leak check (or `npm run content:lint`) checks everything already
+  published against today's list of words.
+- **Rendering per request.** Public pages, feeds, the sitemap, link preview images and the CV PDF render per
+  request from a snapshot of the published content that each server process keeps in memory
+  (`server/content/site.ts`). It asks the database at most every three seconds whether the generation
+  changed and reloads when it did; if the database is unreachable it keeps showing the last copy and asks
+  again after 30 seconds. The process that made a change drops its copy at once. A new database is filled from `content/` once, by
+  `npm run migrate` (or the first request), safely from several processes at the same moment.
+- **Preview.** The editor's Preview button posts to `/admin/preview` (behind the sign-in and Access), which
+  hands out a key for an hour (only its SHA-256 is kept) in a cookie and opens the public page: while the key
+  is valid and the admin session that asked for it is still signed in, public pages show the drafts, under a
+  banner with Exit preview. Link previews, feeds and the sitemap never show drafts.
+- **Media library.** Images are uploaded in the admin (12 MB at most), recognised by their first bytes (PNG,
+  JPEG, GIF, WebP, AVIF; never by name), decoded by sharp, turned upright, scaled to 2400 pixels and written
+  again as WebP, which leaves all metadata behind. They are stored in the database under the SHA-256 of their
+  bytes, so backups include them and the same image is kept once, and served from `/media/<sha256>.webp`
+  with a year's caching. An image still shown by a draft, a published page or a kept version can't be
+  deleted.
+- **GitHub.** Every six hours (or on Sync now) the `github-sync` job reads the owner's public repositories
+  from GitHub's API, page after page, with an ETag so an unchanged list costs nothing; a `GITHUB_TOKEN` is
+  optional. Nothing is removed unless every page was read. A repository
+  appears on the work page only when the owner ticks it (and not when a case study already covers it); case
+  studies show their repository's stars and last update. A repository made private or deleted leaves the
+  list at the next sync.
+
 ## Operations
 
 The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
@@ -557,17 +624,17 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
 - Every public page is checked with axe (WCAG 2.2 AA) in both themes, and for horizontal overflow at 360px;
   the admin's pages are checked with axe as the tests go through them.
 - Admin tests that share data run in order: the sign-in tests, then the inbox and settings, then the work
-  modules, then booking and the calendar, then billing, then the portal (Playwright project dependencies
-  in `playwright.config.ts`). The calendar tests book as visitors in London and New York, and check the invites
+  modules, then booking and the calendar, then billing, then the portal, then the content editor, which
+  changes what public pages show (Playwright project dependencies in `playwright.config.ts`). The calendar tests book as visitors in London and New York, and check the invites
   the emails carry; the billing tests go from a quote to a crypto payment, a bank transfer and its refund, a
   care plan, an expense and the accountant's CSV; the portal tests go from the owner's invitation to the
   client's sign-in, revision rounds (one of them extra), a data request and the owner's answer.
 - The integration tests' `mongod` closes idle files and checkpoints every second: every test file rebuilds
   its database before each test, and WiredTiger would otherwise hold thousands of files and abort at the
   open files limit.
-- NOWPayments and TCMB are played by a local mock in the end-to-end tests (`scripts/lib/e2e-mocks.ts`): it
-  serves NOWPayments' API and payment page, sends signed callbacks when a test "pays", and serves fixed
-  bulletins. The integration tests stub `fetch` instead.
+- NOWPayments, TCMB and GitHub are played by a local mock in the end-to-end tests
+  (`scripts/lib/e2e-mocks.ts`): it serves NOWPayments' API and payment page, sends signed callbacks when a
+  test "pays", serves fixed bulletins and a list of repositories. The integration tests stub `fetch` instead.
 - Offline machines can use local binaries: `MONGOMS_SYSTEM_BINARY=/path/to/mongod`,
   `PW_CHROMIUM_PATH=/path/to/chrome`.
 
@@ -615,6 +682,7 @@ Every direct dependency and why it is here.
 | `@axe-core/playwright`                                                                          | Accessibility checks (WCAG 2.2 AA) in the browser tests.                                                              |
 | `nodemailer`                                                                                    | Sends email over SMTP (STARTTLS, TLS or plain), with correct encoding of non-ASCII names and subjects.                |
 | `croner`                                                                                        | Runs the background jobs (outbox, backups, reminders, rates, recurring invoices) without overlapping runs.            |
+| `sharp`                                                                                         | Re-encodes uploaded images (upright, scaled, WebP, metadata dropped); Next.js already depends on it.                  |
 
 ## Decisions
 
@@ -688,3 +756,15 @@ Every direct dependency and why it is here.
     (lifetimes, sign-out everywhere) without touching the other.
 29. **Another client's data answers 404, never 403**, and the only way to it is a query that filters by
     the signed-in client's id; the pages never receive an id they then have to check.
+30. **Public pages render per request from an in-memory snapshot, not at build time** (M9). Builds see no
+    database (CI has none, and the deploy builds before the migrations and without the production settings),
+    so prerendering from the database would bake stale or starting content into each release. The snapshot
+    makes a page cost no query, an edit shows within seconds without tracking which pages to rebuild, and
+    every page can carry a CSP nonce.
+31. **One `content` collection with a draft and a published copy per item**, instead of a collection per
+    kind: one set of rules for saving, publishing, scheduling, versions and the leak check, and the site's
+    whole content is one query.
+32. **Images in the database, not on disk.** A few hundred re-encoded images fit easily, backups and
+    restores include them with no second folder to copy, and their hash is their address.
+33. **The leak check has no override.** A publication it stops is edited, not forced; the owner's own list
+    of words covers what no pattern can know (client names, private domains).

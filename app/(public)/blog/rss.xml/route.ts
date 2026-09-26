@@ -1,14 +1,14 @@
 import { site } from "@/content/site";
-import { listPosts } from "@/server/content/posts";
+import { publishedContent } from "@/server/content/site";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 function escape(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 export async function GET(): Promise<Response> {
-  const posts = await listPosts();
+  const { posts } = await publishedContent();
   const items = posts
     .map(
       (post) => `    <item>

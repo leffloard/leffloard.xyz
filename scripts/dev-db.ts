@@ -8,6 +8,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { MongoClient } from "mongodb";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
+import { seedContent } from "@/server/content/seed";
 import { runMigrations } from "@/server/db/migrate";
 
 const PORT = Number(process.env.DEV_DB_PORT ?? 27027);
@@ -79,6 +80,7 @@ async function main(): Promise<void> {
   try {
     const applied = await runMigrations(client.db(dbName));
     console.log(applied.length ? `Applied migrations: ${applied.join(", ")}` : "Migrations are up to date.");
+    if (await seedContent(client.db(dbName))) console.log("Filled the site's content from content/.");
   } finally {
     await client.close();
   }

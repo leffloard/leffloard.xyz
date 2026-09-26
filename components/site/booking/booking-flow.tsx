@@ -42,12 +42,14 @@ export function BookingFlow({
   ownerZone,
   ownerEmail,
   turnstileSiteKey,
+  nonce,
 }: {
   type: BookingTypeView;
   initialSlots: string[];
   ownerZone: string;
   ownerEmail: string;
   turnstileSiteKey?: string;
+  nonce?: string;
 }) {
   const [slots, setSlots] = useState(initialSlots);
   const [zone, setZone] = useState<string | null>(null);
@@ -338,7 +340,13 @@ export function BookingFlow({
               </label>
             </div>
             {turnstileSiteKey ? (
-              <Turnstile siteKey={turnstileSiteKey} action="booking" theme="auto" resetKey={attempt} />
+              <Turnstile
+                siteKey={turnstileSiteKey}
+                action="booking"
+                theme="auto"
+                nonce={nonce}
+                resetKey={attempt}
+              />
             ) : null}
             <p className="text-sm text-muted">
               Your details are used for this call only; see the{" "}

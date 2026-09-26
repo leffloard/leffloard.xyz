@@ -31,7 +31,6 @@ import type { MeetingDoc } from "@/server/calendar/types";
 export const metadata = { title: "Today" };
 
 const ROADMAP = [
-  ["M9", "Content editor for the public site, and GitHub sync"],
   ["M10", "AI assistant"],
   ["M11", "Analytics, notification centre, command palette"],
   ["M12", "Security tests, load tests and launch"],

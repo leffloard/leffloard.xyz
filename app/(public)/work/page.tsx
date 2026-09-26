@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { CtaBand } from "@/components/site/cta-band";
 import { PageIntro, Section } from "@/components/site/section";
+import { RepoList } from "@/components/site/repo-list";
 import { WorkCard } from "@/components/site/work-card";
-import { work } from "@/content/work";
+import { pageContent } from "@/server/content/site";
 
 export const metadata: Metadata = {
   title: "Work",
@@ -11,8 +12,11 @@ export const metadata: Metadata = {
   alternates: { canonical: "/work" },
 };
 
-export default function WorkPage() {
+export default async function WorkPage() {
+  const { work, repos } = await pageContent();
   const featured = work.filter((item) => item.featured);
+  const linked = new Set(work.map((item) => item.repo?.toLowerCase()).filter(Boolean));
+  const openSource = repos.filter((repo) => !linked.has(repo.url.toLowerCase()));
   const rest = work.filter((item) => !item.featured);
   return (
     <>
@@ -33,13 +37,26 @@ export default function WorkPage() {
           ))}
         </div>
       </Section>
-      <Section id="more" index="02" label="More projects">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {rest.map((item) => (
-            <WorkCard key={item.slug} item={item} className="reveal min-h-[16rem]" />
-          ))}
-        </div>
-      </Section>
+      {rest.length ? (
+        <Section id="more" index="02" label="More projects">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {rest.map((item) => (
+              <WorkCard key={item.slug} item={item} className="reveal min-h-[16rem]" />
+            ))}
+          </div>
+        </Section>
+      ) : null}
+      {openSource.length ? (
+        <Section
+          id="open-source"
+          index={rest.length ? "03" : "02"}
+          label="Open source"
+          title="Smaller things on GitHub."
+          intro="Public repositories without a case study of their own, straight from GitHub."
+        >
+          <RepoList repos={openSource} />
+        </Section>
+      ) : null}
       <CtaBand />
     </>
   );

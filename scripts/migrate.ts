@@ -6,6 +6,7 @@
 // Exit codes: 0 done, 1 failed, 2 another process holds the migration lock (retry later).
 import { loadEnvConfig } from "@next/env";
 import { MongoServerSelectionError } from "mongodb";
+import { seedContent } from "@/server/content/seed";
 import { closeClient, getDb } from "@/server/db/client";
 import { MigrationLockedError, pendingMigrations, runMigrations } from "@/server/db/migrate";
 import { mongoHosts } from "@/server/db/url";
@@ -37,6 +38,8 @@ async function main(): Promise<number> {
     console.log(
       applied.length ? `Applied on ${target}: ${applied.join(", ")}` : `Nothing to apply on ${target}.`,
     );
+    // A database without the site's content gets it from content/ (once; never again after that).
+    if (await seedContent(db)) console.log("Filled the site's content from content/.");
     return 0;
   } catch (error) {
     if (error instanceof EnvError) {

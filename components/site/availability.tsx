@@ -1,8 +1,9 @@
-import { site } from "@/content/site";
 import { cn } from "@/components/ui/cn";
+import { pageContent } from "@/server/content/site";
 
-export function Availability({ className }: { className?: string }) {
-  const { open, label } = site.availability;
+// The badge set in the content editor's profile.
+export async function Availability({ className }: { className?: string }) {
+  const { open, openLabel, closedLabel } = (await pageContent()).profile.availability;
   return (
     <span
       className={cn(
@@ -14,7 +15,7 @@ export function Availability({ className }: { className?: string }) {
         aria-hidden
         className={cn("size-1.5 rounded-full", open ? "pulse-dot bg-success" : "bg-warning")}
       />
-      {open ? label : "Fully booked at the moment"}
+      {open ? openLabel : closedLabel}
     </span>
   );
 }

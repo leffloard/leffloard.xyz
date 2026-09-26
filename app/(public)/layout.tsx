@@ -2,17 +2,27 @@ import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { SiteFooter } from "@/components/site/site-footer";
+import { PreviewBanner } from "@/components/site/preview-banner";
 import { SiteHeader } from "@/components/site/site-header";
 import { site } from "@/content/site";
+import { pageContent } from "@/server/content/site";
 import "../globals.css";
 
-export const metadata: Metadata = {
+// Rendered per request from the content snapshot (server/content/site.ts): the content lives in the
+// database, which builds never see, and every page gets the nonce Content Security Policy.
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { profile } = await pageContent();
+  return { ...metadata, description: profile.pitch };
+}
+
+const metadata: Metadata = {
   metadataBase: new URL(site.origin),
   title: {
     default: `${site.name}: independent software developer`,
     template: `%s · ${site.name}`,
   },
-  description: site.pitch,
   applicationName: "leffloard.xyz",
   authors: [{ name: site.name, url: site.origin }],
   creator: site.name,
@@ -58,6 +68,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <SiteFooter />
           </div>
         </div>
+        <PreviewBanner />
       </body>
     </html>
   );

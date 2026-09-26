@@ -1,7 +1,8 @@
 // Local stand-ins for the outside services the end-to-end tests touch:
 //   NOWPayments  /v1/invoice, /v1/payment/:id (API), /checkout/:id (its payment page), and
 //                POST /control/pay {invoiceId, status} which "pays" and sends the signed callback (IPN);
-//   TCMB         /kurlar/today.xml and /kurlar/YYYYMM/DDMMYYYY.xml, with fixed rates on weekdays.
+//   TCMB         /kurlar/today.xml and /kurlar/YYYYMM/DDMMYYYY.xml, with fixed rates on weekdays;
+//   GitHub       /github/users/leffloard/repos, two public repositories and a private one.
 import { createHmac } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { addDays, todayIn } from "@/lib/intake/time";
@@ -128,6 +129,33 @@ export function startMocks({ port, apiKey, ipnSecret, rates }: Options): Promise
           body: JSON.stringify(payment),
         });
         return send(response, 200, { paymentId, ipn: { status: answer.status, body: await answer.json() } });
+      }
+
+      // --- GitHub's API ---
+      if (path === "/github/users/leffloard/repos") {
+        const repo = (name: string, extra: Record<string, unknown>) => ({
+          name,
+          html_url: `https://github.com/leffloard/${name}`,
+          description: null,
+          language: "TypeScript",
+          stargazers_count: 0,
+          forks_count: 0,
+          topics: [],
+          pushed_at: "2026-09-20T10:00:00Z",
+          archived: false,
+          fork: false,
+          private: false,
+          ...extra,
+        });
+        return send(response, 200, [
+          repo("MiniEngine", {
+            language: "C++",
+            stargazers_count: 12,
+            description: "A small OpenGL renderer.",
+          }),
+          repo("tiny-queue", { stargazers_count: 4, description: "A job queue in 200 lines." }),
+          repo("private-notes", { private: true }),
+        ]);
       }
 
       // --- TCMB ---

@@ -21,6 +21,7 @@
     "migrate": "tsx --conditions=react-server scripts/migrate.ts",
     "migrate-legacy": "tsx --conditions=react-server scripts/migrate-legacy.ts",
     "backup": "tsx --conditions=react-server scripts/backup.ts",
+    "content:lint": "tsx --conditions=react-server scripts/content-lint.ts",
     "restore": "tsx --conditions=react-server scripts/restore.ts",
     "admin": "tsx --conditions=react-server scripts/admin.ts",
     "admin:create": "tsx --conditions=react-server scripts/admin.ts create"
@@ -47,6 +48,7 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.4",
     "shiki": "^4.4.3",
     "unified": "^11.0.5",
     "zod": "^4.6.5"

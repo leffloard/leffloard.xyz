@@ -29,7 +29,7 @@ export default function ColophonPage() {
         <li>
           Admin sign-in with passkeys or a password plus an authenticator code, with progressive lockouts.
         </li>
-        <li>A Content Security Policy on every page, with per-request nonces on signed-in pages.</li>
+        <li>A Content Security Policy on every page, with a new nonce for scripts on each request.</li>
         <li>No third-party scripts on public pages, apart from Cloudflare&apos;s bot check on forms.</li>
       </ul>
       <h2>Performance and accessibility</h2>

@@ -100,7 +100,9 @@ export type AuditAction =
   | "billing.invoice.voided"
   | "billing.payment.recorded"
   | "billing.payment.refunded"
-  | "finance.exported";
+  | "finance.exported"
+  | "content.published"
+  | "content.deleted";
 
 export type AuditDoc = {
   _id: ObjectId;

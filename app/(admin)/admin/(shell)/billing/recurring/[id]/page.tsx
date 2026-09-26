@@ -105,7 +105,7 @@ export default async function RecurringPlanPage({ params }: { params: Promise<{ 
           initial={recurringEditorValue(plan)}
           clients={clients}
           projects={projects}
-          catalog={serviceCatalog()}
+          catalog={await serviceCatalog()}
           cryptoReady={paymentsAvailable().crypto}
         />
         <Card>

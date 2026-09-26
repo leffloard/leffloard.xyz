@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BookingFlow } from "@/components/site/booking/booking-flow";
@@ -66,6 +67,7 @@ export default async function BookTypePage(props: Props) {
               ownerZone={rules.timeZone}
               ownerEmail={site.email}
               turnstileSiteKey={getEnv().TURNSTILE_SITE_KEY}
+              nonce={(await headers()).get("x-nonce") ?? undefined}
             />
           </div>
           <aside className="grid content-start gap-6 lg:col-span-4">

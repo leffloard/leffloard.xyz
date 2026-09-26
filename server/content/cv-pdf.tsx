@@ -1,11 +1,10 @@
 import "server-only";
 import { Document, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { cv } from "@/content/cv";
 import { site } from "@/content/site";
-import { work } from "@/content/work";
+import type { SiteContent } from "@/lib/content/types";
 import { registerPdfFonts } from "@/server/pdf/fonts";
 
-// The CV as a PDF, generated from the same data as the /cv page.
+// The CV as a PDF, generated from the same content as the /cv page.
 registerPdfFonts();
 
 const INK = "#111317";
@@ -52,8 +51,9 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function CvDocument() {
-  const featured = work.filter((item) => item.featured);
+function CvDocument({ content }: { content: Pick<SiteContent, "cv" | "work"> }) {
+  const { cv } = content;
+  const featured = content.work.filter((item) => item.featured);
   return (
     <Document title={`${site.name} – CV`} author={site.name} subject={cv.headline}>
       <Page size="A4" style={styles.page}>
@@ -142,6 +142,6 @@ function CvDocument() {
   );
 }
 
-export function renderCvPdf(): Promise<Buffer> {
-  return renderToBuffer(<CvDocument />);
+export function renderCvPdf(content: Pick<SiteContent, "cv" | "work">): Promise<Buffer> {
+  return renderToBuffer(<CvDocument content={content} />);
 }

@@ -7,6 +7,7 @@ import path from "node:path";
 import { MongoClient } from "mongodb";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { createOwner } from "@/server/auth/users";
+import { seedContent } from "@/server/content/seed";
 import { runMigrations } from "@/server/db/migrate";
 import {
   E2E_BACKUP_DIR,
@@ -44,6 +45,7 @@ async function main(): Promise<void> {
   const mongoUrl = replSet.getUri();
   const client = await new MongoClient(mongoUrl).connect();
   await runMigrations(client.db(E2E_DB_NAME));
+  await seedContent(client.db(E2E_DB_NAME));
   // The owner account, as "npm run admin -- create" makes it: two-step sign-in is set up by the tests.
   await createOwner(client.db(E2E_DB_NAME), OWNER);
   await client.close();
@@ -80,6 +82,7 @@ async function main(): Promise<void> {
       NOWPAYMENTS_IPN_SECRET: E2E_NOWPAYMENTS.ipnSecret,
       NOWPAYMENTS_API_URL: `${E2E_MOCK_URL}/v1`,
       TCMB_RATES_URL: `${E2E_MOCK_URL}/kurlar`,
+      GITHUB_API_URL: `${E2E_MOCK_URL}/github`,
       LOG_LEVEL: process.env.LOG_LEVEL ?? "warn",
     },
   });

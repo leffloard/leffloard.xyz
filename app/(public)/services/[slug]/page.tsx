@@ -7,17 +7,11 @@ import { Arrow } from "@/components/site/link-button";
 import { PackageCard } from "@/components/site/package-card";
 import { PageIntro, Section } from "@/components/site/section";
 import { WorkCard } from "@/components/site/work-card";
-import { findService, services } from "@/content/services";
-import { findWork, type WorkItem } from "@/content/work";
-
-export const dynamicParams = false;
-
-export function generateStaticParams() {
-  return services.map((service) => ({ slug: service.slug }));
-}
+import { findService, findWork, type WorkItem } from "@/lib/content/types";
+import { pageContent } from "@/server/content/site";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const service = findService((await params).slug);
+  const service = findService(await pageContent(), (await params).slug);
   if (!service) return {};
   return {
     title: service.title,
@@ -27,9 +21,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function ServicePage({ params }: { params: Promise<{ slug: string }> }) {
-  const service = findService((await params).slug);
+  const content = await pageContent();
+  const service = findService(content, (await params).slug);
   if (!service) notFound();
-  const proof = service.proof.map(findWork).filter((item): item is WorkItem => Boolean(item));
+  const proof = service.proof
+    .map((slug) => findWork(content, slug))
+    .filter((item): item is WorkItem => Boolean(item));
 
   return (
     <>

@@ -2,10 +2,11 @@ import Link from "next/link";
 import { ProjectForm } from "@/components/admin/projects/project-form";
 import { PageHeader } from "@/components/admin/shell";
 import { Notice } from "@/components/ui/notice";
-import { services } from "@/content/services";
+import type { Service } from "@/lib/content/types";
 import { amountInput } from "@/lib/money";
 import { requireAdmin } from "@/server/auth/dal";
 import { clientChoices, getClient } from "@/server/clients/store";
+import { publishedContent } from "@/server/content/site";
 import { getDb } from "@/server/db/client";
 import { getInquiry } from "@/server/inquiries/store";
 import { parseId } from "@/server/work/collections";
@@ -17,7 +18,7 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 // The revision rounds of the service's highlighted package, as a starting point.
-function defaultRounds(service: string | null): number {
+function defaultRounds(services: Service[], service: string | null): number {
   const match = services.find((item) => item.slug === service);
   return match?.packages.find((pack) => pack.highlighted)?.revisions ?? 2;
 }
@@ -33,7 +34,11 @@ export default async function NewProjectPage({
   const inquiryId = parseId(first(raw.inquiry));
   const inquiry = inquiryId ? await getInquiry(db, inquiryId) : null;
   const clientId = parseId(first(raw.client)) ?? inquiry?.clientId ?? null;
-  const [client, clients] = await Promise.all([clientId ? getClient(db, clientId) : null, clientChoices(db)]);
+  const [client, clients, { services }] = await Promise.all([
+    clientId ? getClient(db, clientId) : null,
+    clientChoices(db),
+    publishedContent(),
+  ]);
   const service = inquiry?.service && inquiry.service !== "other" ? inquiry.service : null;
   const currency = client?.currency ?? "USD";
   const back = inquiry
@@ -87,7 +92,7 @@ export default async function NewProjectPage({
           pricing: "fixed",
           budget: "",
           hourlyRate: "",
-          includedRevisions: String(defaultRounds(service)),
+          includedRevisions: String(defaultRounds(services, service)),
           extraRevisionPrice: currency === "USD" ? amountInput({ amountMinor: 6_000, currency }) : "",
           tags: "",
         }}

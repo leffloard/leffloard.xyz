@@ -234,6 +234,17 @@ const schema = z.object({
         error: "TCMB_RATES_URL must be an http(s) address, such as https://www.tcmb.gov.tr/kurlar.",
       }),
     ),
+  // GitHub's API, for the public repositories on the work page. Optional: a token (it needs no permissions,
+  // the data is public) only raises the hourly limit. GITHUB_API_URL is for the tests' mock.
+  GITHUB_TOKEN: optionalText(),
+  GITHUB_API_URL: optionalText()
+    .transform((value) => (value ?? "https://api.github.com").replace(/\/+$/, ""))
+    .pipe(
+      z.url({
+        protocol: /^https?$/,
+        error: "GITHUB_API_URL must be an http(s) address, such as https://api.github.com.",
+      }),
+    ),
   // "off" for a second copy of the app (the deploy script's trial start): it serves pages but runs no jobs.
   BACKGROUND_JOBS: optionalText()
     .transform((value) => value?.toLowerCase() ?? "on")

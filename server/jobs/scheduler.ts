@@ -6,6 +6,8 @@ import { nowPaymentsConfig } from "@/server/billing/nowpayments";
 import { runRecurringJob } from "@/server/billing/recurring";
 import { runRemindersJob } from "@/server/billing/reminders";
 import { sendReminders } from "@/server/calendar/booking";
+import { publishDue } from "@/server/content/editor";
+import { runGithubJob } from "@/server/content/github";
 import { getDb } from "@/server/db/client";
 import { getEnv } from "@/server/env";
 import { runRatesJob } from "@/server/finance/rates";
@@ -21,6 +23,31 @@ import { drainOutbox } from "@/server/notify/outbox";
 type Job = { name: string; pattern: string; run: () => Promise<void> };
 
 const JOBS: Job[] = [
+  {
+    // Publishes content the owner scheduled (server/content/editor.ts).
+    name: "content-publish",
+    pattern: "* * * * *",
+    run: async () => {
+      const result = await publishDue(await getDb(), {
+        siteUrl: getEnv().SITE_URL,
+        channels: readChannels(),
+      });
+      if (result.published + result.failed > 0) log.info(result, "scheduled content");
+    },
+  },
+  {
+    // The owner's public GitHub repositories for the work page, every six hours (server/content/github.ts).
+    name: "github-sync",
+    pattern: "*/30 * * * *",
+    run: async () => {
+      const env = getEnv();
+      const outcome = await runGithubJob(await getDb(), {
+        apiUrl: env.GITHUB_API_URL,
+        token: env.GITHUB_TOKEN,
+      });
+      if (outcome.ran) log.info({ ok: outcome.ok, result: outcome.message }, "github sync");
+    },
+  },
   {
     // Sends queued emails and Discord messages that could not go out right away, and retries failures.
     name: "outbox",

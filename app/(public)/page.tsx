@@ -4,22 +4,24 @@ import { PostList } from "@/components/site/post-list";
 import { Section } from "@/components/site/section";
 import { ServiceCard } from "@/components/site/service-card";
 import { SignalField } from "@/components/site/signal-field";
+import { Testimonials } from "@/components/site/testimonials";
 import { Availability } from "@/components/site/availability";
 import { WorkCard } from "@/components/site/work-card";
-import { services } from "@/content/services";
-import { process, site } from "@/content/site";
-import { publicRepoCount, work } from "@/content/work";
-import { listPosts } from "@/server/content/posts";
+import { site } from "@/content/site";
+import { publicRepoCount } from "@/lib/content/types";
+import { pageContent } from "@/server/content/site";
 
 const delay = (ms: number) => ({ "--delay": `${ms}ms` }) as React.CSSProperties;
 
 export default async function HomePage() {
+  const content = await pageContent();
+  const { work, services } = content;
   const featured = work.filter((item) => item.featured);
-  const posts = (await listPosts()).slice(0, 3);
+  const posts = content.posts.slice(0, 3);
   const proof = [
     { value: String(site.since), label: "Freelancing since" },
     { value: String(work.length), label: "Projects on this site" },
-    { value: String(publicRepoCount), label: "Open-source repositories" },
+    { value: String(publicRepoCount(content)), label: "Open-source repositories" },
     { value: site.timeZoneLabel, label: `${site.location}, remote` },
   ];
 
@@ -142,7 +144,7 @@ export default async function HomePage() {
         title="From first message to launch, without surprises."
       >
         <ol className="grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-4">
-          {process.map((step, index) => (
+          {content.profile.process.map((step, index) => (
             <li key={step.title} className="reveal bg-canvas p-6 sm:p-7">
               <span className="font-mono text-xs text-accent">{String(index + 1).padStart(2, "0")}</span>
               <h3 className="mt-6 text-lg font-semibold tracking-tight">{step.title}</h3>
@@ -152,10 +154,16 @@ export default async function HomePage() {
         </ol>
       </Section>
 
+      {content.testimonials.length > 0 ? (
+        <Section id="clients" index="04" label="Clients" title="In their words.">
+          <Testimonials items={content.testimonials.slice(0, 4)} />
+        </Section>
+      ) : null}
+
       {posts.length > 0 ? (
         <Section
           id="writing"
-          index="04"
+          index={content.testimonials.length > 0 ? "05" : "04"}
           label="Writing"
           title="Notes from the work."
           action={

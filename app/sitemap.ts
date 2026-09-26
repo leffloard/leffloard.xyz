@@ -1,11 +1,15 @@
 import type { MetadataRoute } from "next";
-import { services } from "@/content/services";
 import { site } from "@/content/site";
-import { work } from "@/content/work";
-import { listPosts, listTags } from "@/server/content/posts";
+import { postTags } from "@/lib/content/types";
+import { publishedContent } from "@/server/content/site";
+
+// From the published content, on request (the content lives in the database).
+export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [posts, tags] = await Promise.all([listPosts(), listTags()]);
+  const content = await publishedContent();
+  const { work, services, posts } = content;
+  const tags = postTags(content);
   const page = (path: string, priority = 0.6, lastModified?: string) => ({
     url: `${site.origin}${path}`,
     priority,

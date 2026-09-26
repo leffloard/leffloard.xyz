@@ -2,15 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LinkButton } from "@/components/site/link-button";
 import { PrintButton } from "@/components/site/print-button";
-import { cv } from "@/content/cv";
 import { site } from "@/content/site";
-import { findWork, work } from "@/content/work";
+import { findWork, type WorkItem } from "@/lib/content/types";
+import { pageContent } from "@/server/content/site";
 
-export const metadata: Metadata = {
-  title: "CV",
-  description: `CV of ${site.name}, ${cv.headline.toLowerCase()} in ${site.location}.`,
-  alternates: { canonical: "/cv" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { cv } = await pageContent();
+  return {
+    title: "CV",
+    description: `CV of ${site.name}, ${cv.headline.toLowerCase()} in ${site.location}.`,
+    alternates: { canonical: "/cv" },
+  };
+}
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -23,8 +26,13 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-export default function CvPage() {
-  const featured = work.filter((item) => item.featured);
+export default async function CvPage() {
+  const content = await pageContent();
+  const { cv } = content;
+  const featured = content.work.filter((item) => item.featured);
+  // Projects that show a skill, when they are on the site.
+  const shown = (slugs: string[]) =>
+    slugs.map((slug) => findWork(content, slug)).filter((item): item is WorkItem => Boolean(item));
   return (
     <article className="px-5 py-16 sm:px-10 sm:py-24 print:p-0">
       <header className="grid gap-6 pb-10 md:grid-cols-12">
@@ -103,20 +111,22 @@ export default function CvPage() {
               <dt className="font-medium">{skill.group}</dt>
               <dd>
                 <span>{skill.items.join(", ")}</span>
-                <span className="block text-sm text-muted print:hidden">
-                  Seen in{" "}
-                  {skill.proof.map((slug, index) => (
-                    <span key={slug}>
-                      {index > 0 ? ", " : ""}
-                      <Link
-                        href={`/work/${slug}`}
-                        className="underline-offset-4 hover:text-accent hover:underline"
-                      >
-                        {findWork(slug)?.title ?? slug}
-                      </Link>
-                    </span>
-                  ))}
-                </span>
+                {shown(skill.proof).length ? (
+                  <span className="block text-sm text-muted print:hidden">
+                    Seen in{" "}
+                    {shown(skill.proof).map((item, index) => (
+                      <span key={item.slug}>
+                        {index > 0 ? ", " : ""}
+                        <Link
+                          href={`/work/${item.slug}`}
+                          className="underline-offset-4 hover:text-accent hover:underline"
+                        >
+                          {item.title}
+                        </Link>
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
               </dd>
             </div>
           ))}

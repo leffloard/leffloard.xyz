@@ -1,11 +1,12 @@
 import { site } from "@/content/site";
 import { renderCvPdf } from "@/server/content/cv-pdf";
+import { publishedContent } from "@/server/content/site";
 
-// Generated at build time from content/cv.ts, like the /cv page.
-export const dynamic = "force-static";
+// Made on request from the published content, like the /cv page.
+export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-  const pdf = await renderCvPdf();
+  const pdf = await renderCvPdf(await publishedContent());
   return new Response(new Uint8Array(pdf), {
     headers: {
       "content-type": "application/pdf",

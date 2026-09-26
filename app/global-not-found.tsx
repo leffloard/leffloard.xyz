@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
+import { headers } from "next/headers";
 import Link from "next/link";
 import "./globals.css";
 
@@ -8,7 +9,10 @@ export const metadata: Metadata = {
   title: "Page not found — Mert Kaan Koparan",
 };
 
-export default function GlobalNotFound() {
+// Rendered per request (reading the request's headers makes it so), so it carries the CSP nonce that the
+// proxy gives an address under the site's page sections (/legal/…, /work/a/b).
+export default async function GlobalNotFound() {
+  await headers();
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>

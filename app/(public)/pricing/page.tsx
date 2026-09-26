@@ -5,7 +5,7 @@ import { Faq } from "@/components/site/faq";
 import { Arrow } from "@/components/site/link-button";
 import { PageIntro, Section } from "@/components/site/section";
 import { formatPrice } from "@/components/site/service-card";
-import { paymentMethods, paymentTerms, pricingFaq, services, termsList } from "@/content/services";
+import { pageContent } from "@/server/content/site";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -14,7 +14,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing" },
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const { services, pricing } = await pageContent();
   return (
     <>
       <PageIntro
@@ -69,7 +70,7 @@ export default function PricingPage() {
 
       <Section id="terms" index="02" label="Terms" title="How payment works.">
         <div className="grid gap-4 md:grid-cols-3">
-          {paymentTerms.map((term) => (
+          {pricing.paymentTerms.map((term) => (
             <div key={term.title} className="reveal rounded-2xl border border-line p-6">
               <p className="font-mono text-xs text-accent">{term.title}</p>
               <p className="mt-3 text-lg">{term.text}</p>
@@ -77,7 +78,7 @@ export default function PricingPage() {
           ))}
         </div>
         <ul className="prose-list mt-10 max-w-3xl">
-          {termsList.map((line) => (
+          {pricing.terms.map((line) => (
             <li key={line}>{line}</li>
           ))}
         </ul>
@@ -85,7 +86,7 @@ export default function PricingPage() {
 
       <Section id="methods" index="03" label="Payment methods">
         <ul className="grid gap-4 md:grid-cols-3">
-          {paymentMethods.map((method) => (
+          {pricing.paymentMethods.map((method) => (
             <li key={method.name} className="rounded-2xl border border-line p-6">
               <p className="text-lg font-semibold">{method.name}</p>
               <p className="mt-2 text-[15px] text-muted">{method.note}</p>
@@ -95,7 +96,7 @@ export default function PricingPage() {
       </Section>
 
       <Section id="faq" index="04" label="Questions">
-        <Faq items={pricingFaq} />
+        <Faq items={pricing.faq} />
       </Section>
       <CtaBand />
     </>

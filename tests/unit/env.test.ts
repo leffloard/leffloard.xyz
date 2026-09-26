@@ -44,6 +44,8 @@ describe("readEnv", () => {
         NOWPAYMENTS_IPN_SECRET: undefined,
         NOWPAYMENTS_API_URL: "https://api.nowpayments.io/v1",
         TCMB_RATES_URL: "https://www.tcmb.gov.tr/kurlar",
+        GITHUB_TOKEN: undefined,
+        GITHUB_API_URL: "https://api.github.com",
         BACKGROUND_JOBS: "on",
       },
     });

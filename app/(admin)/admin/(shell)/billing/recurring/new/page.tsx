@@ -69,7 +69,7 @@ export default async function NewRecurringPage({
         initial={initial}
         clients={clients}
         projects={projects}
-        catalog={serviceCatalog()}
+        catalog={await serviceCatalog()}
         cryptoReady={available.crypto}
       />
     </>

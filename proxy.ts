@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { contentSecurityPolicy, CSP_REPORT_PATH, isDynamicPath } from "@/lib/csp";
+import { contentSecurityPolicy, CSP_REPORT_PATH, isPrivatePath, usesNonce } from "@/lib/csp";
 
 // Response headers, CSP nonces and request ids only. Authorization never lives here: every page, action
 // and route handler checks access itself, so a request that skips the proxy gains nothing.
 export function proxy(request: NextRequest): NextResponse {
   const requestId = crypto.randomUUID();
-  const dynamic = isDynamicPath(request.nextUrl.pathname);
-  const nonce = dynamic
+  const { pathname } = request.nextUrl;
+  const nonce = usesNonce(pathname)
     ? Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64")
     : undefined;
   const policy = contentSecurityPolicy({ nonce, dev: process.env.NODE_ENV === "development" });
@@ -25,10 +25,11 @@ export function proxy(request: NextRequest): NextResponse {
   response.headers.set("x-request-id", requestId);
   response.headers.set("content-security-policy", policy);
   response.headers.set("reporting-endpoints", `csp="${CSP_REPORT_PATH}"`);
-  if (dynamic) response.headers.set("x-robots-tag", "noindex, nofollow");
+  if (isPrivatePath(pathname)) response.headers.set("x-robots-tag", "noindex, nofollow");
   return response;
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)"],
+  // Images from the media library keep their own, stricter headers (app/media/[file]/route.ts).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|media/).*)"],
 };

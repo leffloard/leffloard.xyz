@@ -33,8 +33,10 @@ for (const path of PAGES) {
     await expect(page).toHaveTitle(/Mert Kaan Koparan/);
 
     const headers = response!.headers();
+    // Every page gets a fresh nonce; public pages stay open to search engines.
     expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
-    expect(headers["content-security-policy"]).not.toContain("'nonce-");
+    expect(headers["content-security-policy"]).toMatch(/script-src 'self' 'nonce-[\w+/=]+' 'strict-dynamic'/);
+    expect(headers["content-security-policy"]).not.toContain("'unsafe-inline' https");
     expect(headers["x-robots-tag"]).toBeUndefined();
 
     // Scroll-driven reveals keep content below the fold transparent until it is scrolled into view, which

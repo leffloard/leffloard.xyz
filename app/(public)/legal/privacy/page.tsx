@@ -52,6 +52,10 @@ export default function PrivacyPage() {
           projects; and the revision and data requests you send from it.
         </li>
         <li>
+          <strong>Testimonials</strong>, only from clients who agree: their name, role and what they said
+          about the work, and my own note of how and when they agreed (never shown).
+        </li>
+        <li>
           <strong>Technical data</strong> needed to run the site securely: IP address, browser type and the
           time of a request, used for rate limits, abuse prevention and security logs.
         </li>
@@ -76,6 +80,10 @@ export default function PrivacyPage() {
           performance of a contract.
         </li>
         <li>To answer a request about your data: my legal obligations under KVKK and the GDPR.</li>
+        <li>
+          To show a testimonial: the person&apos;s consent, which they can withdraw at any time; I then take
+          it down.
+        </li>
         <li>To keep the site secure: my legitimate interest in preventing abuse.</li>
       </ul>
       <h2>Who processes it for me</h2>
@@ -112,7 +120,8 @@ export default function PrivacyPage() {
         provider&apos;s notifications about a payment are kept for about 13 months. Security logs are kept for
         up to 12 months. A sign-in link for the client portal works once and expires after 20 minutes (an
         invitation after 7 days); a portal sign-in ends after 7 days without use and is deleted at the latest
-        30 days after it started. Project updates and your data requests are kept with your client record.
+        30 days after it started. Project updates and your data requests are kept with your client record. A
+        testimonial stays on the site until the person asks me to take it down.
       </p>
       <h2>Your rights</h2>
       <p>

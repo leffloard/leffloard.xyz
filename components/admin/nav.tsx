@@ -51,6 +51,11 @@ const ITEMS: Item[] = [
   },
   { href: "/admin/time", label: "Time", icon: "M10 17a7 7 0 100-14 7 7 0 000 14zM10 6.5V10l2.5 1.8" },
   {
+    href: "/admin/content",
+    label: "Content",
+    icon: "M4 4h12v12H4zM4 8h12M8 8v8",
+  },
+  {
     href: "/admin/security",
     label: "Security",
     icon: "M10 3l6 2.5v4.2c0 3.6-2.5 6.3-6 7.3-3.5-1-6-3.7-6-7.3V5.5z",

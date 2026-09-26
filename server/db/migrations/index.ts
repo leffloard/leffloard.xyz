@@ -438,4 +438,29 @@ export const migrations: Migration[] = [
       await db.collection("clients").createIndex({ "portal.enabled": 1, emailKey: 1 });
     },
   },
+  {
+    id: "0010",
+    name: "content",
+    async up(db) {
+      // The site's content (server/content): one draft and one published copy per item. The first request
+      // fills an empty database from content/ (seedContent), not this migration.
+      const content = db.collection("content");
+      await content.createIndex({ kind: 1, key: 1 }, { unique: true, name: "one_key_per_kind" });
+      await content.createIndex(
+        { kind: 1, "published.slug": 1 },
+        {
+          unique: true,
+          name: "one_published_slug_per_kind",
+          partialFilterExpression: { "published.slug": { $type: "string" } },
+        },
+      );
+      await content.createIndex({ kind: 1, rank: 1 });
+      await content.createIndex(
+        { publishAt: 1 },
+        { partialFilterExpression: { publishAt: { $type: "date" } } },
+      );
+      await db.collection("content_versions").createIndex({ contentId: 1, replacedAt: -1 });
+      await db.collection("content_previews").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    },
+  },
 ];

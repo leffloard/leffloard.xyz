@@ -1,8 +1,9 @@
 // Content Security Policy builder, used by proxy.ts.
 //
-// Pages rendered per request (admin, client portal, link pages) get a nonce policy: only scripts carrying
-// the per-request nonce, and what they load ('strict-dynamic'), can run. Prerendered public pages cannot
-// carry a nonce, so they allow inline scripts but no script from anywhere except this site and Turnstile.
+// Every page the app renders gets a nonce policy: only scripts carrying the per-request nonce, and what they
+// load ('strict-dynamic'), can run. The one prerendered page, the 404 for addresses that match no route,
+// cannot carry a nonce, so it allows inline scripts but no script from anywhere except this site and
+// Turnstile.
 
 export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 export const CSP_REPORT_PATH = "/api/csp-report";
@@ -44,13 +45,36 @@ export function contentSecurityPolicy({ nonce, dev }: CspOptions): string {
   return directives.map((parts) => parts.join(" ")).join("; ");
 }
 
-// Paths rendered per request, which get the nonce policy.
-const DYNAMIC_PREFIXES = ["/admin", "/portal", "/q/", "/i/", "/pay", "/meeting/"];
-
-export function isDynamicPath(pathname: string): boolean {
-  return DYNAMIC_PREFIXES.some((prefix) =>
+function under(pathname: string, prefixes: readonly string[]): boolean {
+  return prefixes.some((prefix) =>
     prefix.endsWith("/")
       ? pathname.startsWith(prefix)
       : pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+}
+
+// Signed-in pages and secret-link pages: rendered per request and kept out of search engines.
+const PRIVATE_PREFIXES = ["/admin", "/portal", "/q/", "/i/", "/pay", "/meeting/"];
+
+// Every route with pages. An address outside them gets the prerendered 404 page.
+const PAGE_PREFIXES = [
+  ...PRIVATE_PREFIXES,
+  "/work",
+  "/services",
+  "/pricing",
+  "/about",
+  "/cv",
+  "/blog",
+  "/contact",
+  "/book",
+  "/legal",
+  "/colophon",
+];
+
+export function isPrivatePath(pathname: string): boolean {
+  return under(pathname, PRIVATE_PREFIXES);
+}
+
+export function usesNonce(pathname: string): boolean {
+  return pathname === "/" || under(pathname, PAGE_PREFIXES);
 }

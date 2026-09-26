@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Arrow } from "@/components/site/link-button";
 import { Spotlight } from "@/components/site/spotlight";
 import { cn } from "@/components/ui/cn";
-import type { WorkItem } from "@/content/work";
+import type { WorkItem } from "@/lib/content/types";
 
 export function WorkCard({
   item,
@@ -25,7 +25,7 @@ export function WorkCard({
             {item.kind} · {item.year}
           </span>
         </div>
-        {item.highlights ? (
+        {item.highlights.length ? (
           <ul
             className={cn(
               "grid gap-1.5 font-mono text-xs text-muted",

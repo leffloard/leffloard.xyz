@@ -4,8 +4,7 @@ import { CtaBand } from "@/components/site/cta-band";
 import { Arrow } from "@/components/site/link-button";
 import { PageIntro, Section } from "@/components/site/section";
 import { formatPrice } from "@/components/site/service-card";
-import { services } from "@/content/services";
-import { process } from "@/content/site";
+import { pageContent } from "@/server/content/site";
 
 export const metadata: Metadata = {
   title: "Services",
@@ -14,7 +13,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/services" },
 };
 
-export default function ServicesPage() {
+export default async function ServicesPage() {
+  const { services, profile } = await pageContent();
   return (
     <>
       <PageIntro
@@ -62,7 +62,7 @@ export default function ServicesPage() {
       })}
       <Section id="process" label="How a project runs" title="The same four steps, whatever the size.">
         <ol className="grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-4">
-          {process.map((step, index) => (
+          {profile.process.map((step, index) => (
             <li key={step.title} className="bg-canvas p-6">
               <span className="font-mono text-xs text-accent">{String(index + 1).padStart(2, "0")}</span>
               <h3 className="mt-5 font-semibold">{step.title}</h3>

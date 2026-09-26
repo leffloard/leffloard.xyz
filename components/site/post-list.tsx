@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Arrow } from "@/components/site/link-button";
-import { formatPostDate, type PostMeta } from "@/server/content/posts";
+import { formatPostDate, type PostMeta } from "@/lib/content/types";
 
 export function PostList({ posts }: { posts: PostMeta[] }) {
   return (

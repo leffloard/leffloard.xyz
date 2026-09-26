@@ -102,7 +102,15 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
 
-export function ContactForm({ email, turnstileSiteKey }: { email: string; turnstileSiteKey?: string }) {
+export function ContactForm({
+  email,
+  turnstileSiteKey,
+  nonce,
+}: {
+  email: string;
+  turnstileSiteKey?: string;
+  nonce?: string;
+}) {
   const [kind, setKind] = useState<InquiryKind>("brief");
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<Values>(EMPTY);
@@ -522,7 +530,13 @@ export function ContactForm({ email, turnstileSiteKey }: { email: string; turnst
                 </label>
               </div>
               {turnstileSiteKey ? (
-                <Turnstile siteKey={turnstileSiteKey} action="contact" theme="auto" resetKey={attempt} />
+                <Turnstile
+                  siteKey={turnstileSiteKey}
+                  action="contact"
+                  theme="auto"
+                  nonce={nonce}
+                  resetKey={attempt}
+                />
               ) : null}
               <p className="text-sm text-muted">
                 Sent to me only. How I handle it is in the{" "}

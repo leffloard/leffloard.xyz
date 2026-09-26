@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentSecurityPolicy, isDynamicPath } from "@/lib/csp";
+import { contentSecurityPolicy, isPrivatePath, usesNonce } from "@/lib/csp";
 
 function directives(policy: string): Map<string, string[]> {
   return new Map(
@@ -37,7 +37,7 @@ describe("contentSecurityPolicy", () => {
     expect(policy.has("upgrade-insecure-requests")).toBe(false);
   });
 
-  it("gives prerendered pages a policy without a nonce", () => {
+  it("gives the prerendered 404 page a policy without a nonce", () => {
     const policy = directives(contentSecurityPolicy({ dev: false }));
     expect(policy.get("script-src")).toEqual([
       "'self'",
@@ -48,7 +48,7 @@ describe("contentSecurityPolicy", () => {
   });
 });
 
-describe("isDynamicPath", () => {
+describe("isPrivatePath", () => {
   it.each([
     ["/admin", true],
     ["/admin/login", true],
@@ -62,6 +62,25 @@ describe("isDynamicPath", () => {
     ["/work/some-case", false],
     ["/invoices", false],
   ])("%s -> %s", (path, expected) => {
-    expect(isDynamicPath(path)).toBe(expected);
+    expect(isPrivatePath(path)).toBe(expected);
+  });
+});
+
+describe("usesNonce", () => {
+  it.each([
+    ["/", true],
+    ["/work", true],
+    ["/work/some-case", true],
+    ["/blog/tags/security", true],
+    ["/contact", true],
+    ["/book/intro-call", true],
+    ["/legal/privacy", true],
+    ["/admin/inbox", true],
+    ["/portal", true],
+    ["/i/abc", true],
+    ["/no-such-page", false],
+    ["/workshop", false],
+  ])("%s -> %s", (path, expected) => {
+    expect(usesNonce(path)).toBe(expected);
   });
 });

@@ -3,16 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CtaBand } from "@/components/site/cta-band";
 import { Arrow } from "@/components/site/link-button";
-import { findWork, work } from "@/content/work";
-
-export const dynamicParams = false;
-
-export function generateStaticParams() {
-  return work.map((item) => ({ slug: item.slug }));
-}
+import { Testimonials } from "@/components/site/testimonials";
+import { findWork, formatPostDate } from "@/lib/content/types";
+import { pageContent } from "@/server/content/site";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const item = findWork((await params).slug);
+  const item = findWork(await pageContent(), (await params).slug);
   if (!item) return {};
   return {
     title: item.title,
@@ -23,8 +19,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function CaseStudyPage({ params }: { params: Promise<{ slug: string }> }) {
-  const item = findWork((await params).slug);
+  const { work, testimonials, repoStats } = await pageContent();
+  const item = findWork({ work }, (await params).slug);
   if (!item) notFound();
+  const quotes = testimonials.filter((quote) => quote.workSlug === item.slug);
+  const stats = item.repo ? repoStats[item.repo.toLowerCase()] : undefined;
   const index = work.indexOf(item);
   const next = work[(index + 1) % work.length]!;
   const facts = [
@@ -97,6 +96,13 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
                 ) : (
                   <span className="text-muted">Private repository</span>
                 )}
+                {stats ? (
+                  <span className="mt-1 block font-mono text-xs text-muted">
+                    <span aria-hidden>★ </span>
+                    {stats.stars} {stats.stars === 1 ? "star" : "stars"}
+                    {stats.pushedAt ? ` · updated ${formatPostDate(stats.pushedAt)}` : ""}
+                  </span>
+                ) : null}
               </dd>
             </div>
           </dl>
@@ -104,32 +110,26 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
 
         <div className="md:col-span-8">
           <p className="text-xl leading-relaxed text-pretty">{item.summary}</p>
+          {item.lead ? (
+            // Sanitized when it was saved (server/content/render.ts).
+            <div className="prose mt-8" dangerouslySetInnerHTML={{ __html: item.lead }} />
+          ) : null}
           {item.sections.map((section, sectionIndex) => (
-            <section
-              key={section.heading}
-              className="reveal mt-14"
-              aria-labelledby={`section-${sectionIndex}`}
-            >
+            <section key={section.id} className="reveal mt-14" aria-labelledby={section.id}>
               <p className="font-mono text-[11px] tracking-[0.14em] text-accent uppercase">
                 {String(sectionIndex + 1).padStart(2, "0")}
               </p>
-              <h2 id={`section-${sectionIndex}`} className="mt-2 text-2xl font-semibold tracking-tight">
+              <h2 id={section.id} className="mt-2 text-2xl font-semibold tracking-tight">
                 {section.heading}
               </h2>
-              <div className="prose mt-4">
-                {section.paragraphs.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-                {section.points ? (
-                  <ul>
-                    {section.points.map((point) => (
-                      <li key={point}>{point}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
+              <div className="prose mt-4" dangerouslySetInnerHTML={{ __html: section.html }} />
             </section>
           ))}
+          {quotes.length ? (
+            <section className="mt-14" aria-label="What the client said">
+              <Testimonials items={quotes} />
+            </section>
+          ) : null}
         </div>
       </div>
 

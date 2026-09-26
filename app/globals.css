@@ -277,6 +277,15 @@ body {
   color: var(--color-muted);
 }
 
+/* Images from the media library (the only ones the Markdown keeps). */
+.prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+}
+
 .prose hr {
   border-color: var(--color-line);
   margin-block: 2.5em;

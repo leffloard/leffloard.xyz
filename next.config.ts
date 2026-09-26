@@ -29,13 +29,15 @@ const nextConfig: NextConfig = {
   },
   // Packages that load files at runtime (fonts, grammars) stay outside the server bundle.
   serverExternalPackages: ["@react-pdf/renderer", "shiki", "@shikijs/rehype"],
-  // Quote and invoice PDFs are made on request and read these font files by path, which the standalone
-  // output would otherwise leave behind.
+  // Files read by path on request, which the standalone output would otherwise leave behind: the fonts of
+  // the PDFs and the link preview images, and the blog posts a new database starts with (server/content).
   outputFileTracingIncludes: {
     "/**": [
       "./node_modules/geist/dist/fonts/geist-sans/Geist-Regular.ttf",
       "./node_modules/geist/dist/fonts/geist-sans/Geist-Medium.ttf",
       "./node_modules/geist/dist/fonts/geist-sans/Geist-SemiBold.ttf",
+      "./node_modules/geist/dist/fonts/geist-mono/GeistMono-Regular.ttf",
+      "./content/blog/*.md",
     ],
   },
   async redirects() {
@@ -50,6 +52,8 @@ const nextConfig: NextConfig = {
       },
       { source: "/", has: [{ type: "query", key: "type" }], destination: "/contact", permanent: false },
       { source: "/blog/:id(\\d+)", destination: "/blog", permanent: true },
+      // Browsers ask for /favicon.ico whatever a page declares; the site's icon is the SVG.
+      { source: "/favicon.ico", destination: "/icon.svg", permanent: true },
     ];
   },
   async headers() {

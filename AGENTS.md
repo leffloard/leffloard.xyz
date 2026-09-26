@@ -80,5 +80,13 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
 - Every change comes with tests. Unit tests need no database; integration tests use the throwaway replica set
   from `tests/integration/global-setup.ts`.
 - Content scope: no case studies, marketing copy or pricing for game-modification projects or cheat loaders.
-- Public content (`content/`) states only verifiable facts. Private projects never link to their code and
-  never name customers, amounts, domains or ids. `tests/unit/content.test.ts` enforces the checkable parts.
+- Public content states only verifiable facts. Private projects never link to their code and never name
+  customers, amounts, domains or ids. The leak check (`lib/content/leaks.ts`) runs before every publication,
+  and `tests/unit/content.test.ts` checks the seed in `content/`.
+- The public site's content lives in the database (`server/content`). Public pages read it only through
+  `pageContent()` (drafts during the owner's preview) or `publishedContent()` (feeds, sitemap, link previews,
+  PDFs: never drafts); changes go only through `server/content/editor.ts`, which checks, versions and raises
+  the content's generation. Never write the `content` collection elsewhere, and never inject Markdown that
+  was not rendered and sanitized by `server/content/render.ts`.
+- Uploaded images go only through `storeImage()` (`server/content/media.ts`): recognised by their bytes,
+  re-encoded, served from `/media/<sha256>.webp`. Never serve an upload as it arrived.

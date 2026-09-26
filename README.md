@@ -23,19 +23,10 @@ folder to start empty.
 
 ### Editing the public site
 
-Until the admin's content editor arrives, the site's text lives in `content/`:
-
-| File | What it holds |
-| --- | --- |
-| `content/site.ts` | Name, email, location, availability badge ("Taking new projects") |
-| `content/work.ts` | Portfolio projects and their case studies |
-| `content/services.ts` | Services, packages, prices, payment terms and FAQ |
-| `content/cv.ts` | The CV (also used for `/cv.pdf`) |
-| `content/blog/*.md` | Blog posts (Markdown with `title`, `description`, `date`, `tags` at the top) |
-
-Your photo: save it as `public/images/profile.jpg` (portrait, about 1200 × 1500) and rebuild; until then the
-About page shows your initials. `npm run test:unit` checks the content for broken links between projects,
-phone numbers and other things that must not be published.
+Everything the site shows is edited in the admin, under **Content** (see below). The files in `content/` are
+only what a new database starts with (`npm run dev:db` and the first deploy copy them in once); editing them
+changes nothing on a running site. Your photo: save it as `public/images/profile.jpg` (portrait, about
+1200 × 1500) and deploy; until then the About page shows your initials.
 
 ### The admin (`/admin`)
 
@@ -138,6 +129,26 @@ v1 data is only read, never changed.
 - **Expenses**: add what you pay for hosting, software, fees or hardware, with the receipt's number.
 - **Export**: a CSV for your accountant with every payment, refund and expense, in a form Excel opens on a
   Turkish Windows.
+
+### Content (`/admin/content`)
+
+- **Work, Blog, Services, Testimonials**: open an item, change it and **Save the draft**. The site keeps
+  showing the published version until you press **Publish**. **Preview** opens the real page with your drafts
+  (for an hour, with a banner and an **Exit preview** button); only you see it.
+- **Case studies and posts** are Markdown: `## A heading` starts a numbered section of a case study, code
+  goes between ``` lines. Images: upload them under **Media**, then paste their Markdown where they belong.
+- **Profile**: the availability badge ("Taking new projects" or "Fully booked"), the pitch and the steps of
+  how a project runs. **CV** and **Pricing terms** are edited the same way.
+- **Publish later**: pick a day and a time (Istanbul) and it goes live by itself; if something stops it, you
+  get an email.
+- **Earlier versions**: every publication keeps the copy it replaced; **Bring back** puts one into the draft.
+- **Leak check**: every publication is checked for keys, webhooks, Discord ids, IP addresses, other people's
+  emails, phone numbers and the words you list under **Leak check** (client names, private domains). If it
+  finds something, nothing is published and you see what it found.
+- **Testimonials** are published only once you tick that the person agreed, and note how.
+- **GitHub**: the public repositories of your account, read every six hours (or **Sync now**). Tick the ones
+  the work page should list; case studies show their repository's stars either way. Optional:
+  `GITHUB_TOKEN` (a fine-grained token with no permissions) raises GitHub's hourly limit.
 
 ### The client portal (`/portal`)
 

@@ -1,7 +1,7 @@
 import "server-only";
 import type { Db } from "mongodb";
-import { services } from "@/content/services";
 import type { Currency } from "@/lib/money";
+import { publishedContent } from "@/server/content/site";
 import { clients, projects } from "@/server/work/collections";
 
 // The choices the billing editors offer: clients with what fills a document's "For", their projects, and the
@@ -44,7 +44,8 @@ export async function billingProjects(db: Db): Promise<{ id: string; label: stri
   }));
 }
 
-export function serviceCatalog(): { label: string; description: string; unitPrice: string }[] {
+export async function serviceCatalog(): Promise<{ label: string; description: string; unitPrice: string }[]> {
+  const { services } = await publishedContent();
   return services.flatMap((service) =>
     service.packages.map((pack) => ({
       label: `${service.title}: ${pack.name} (from $${pack.price.toLocaleString("en-US")}${pack.per ? ` a ${pack.per}` : ""})`,

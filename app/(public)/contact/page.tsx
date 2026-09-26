@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Availability } from "@/components/site/availability";
 import { ContactForm } from "@/components/site/contact-form";
 import { Arrow, LinkButton } from "@/components/site/link-button";
@@ -32,7 +33,7 @@ const next = [
   { title: "A written quote", text: "Scope, fixed price, milestones and timeline, valid for 14 days." },
 ];
 
-export default function ContactPage() {
+export default async function ContactPage() {
   const subject = encodeURIComponent("Project inquiry");
   return (
     <>
@@ -60,7 +61,11 @@ export default function ContactPage() {
       <Section id="write" index="01" label="Write to me">
         <div className="grid gap-10 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <ContactForm email={site.email} turnstileSiteKey={getEnv().TURNSTILE_SITE_KEY} />
+            <ContactForm
+              email={site.email}
+              turnstileSiteKey={getEnv().TURNSTILE_SITE_KEY}
+              nonce={(await headers()).get("x-nonce") ?? undefined}
+            />
           </div>
           <aside className="lg:col-span-4">
             <h3 className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">Worth including</h3>

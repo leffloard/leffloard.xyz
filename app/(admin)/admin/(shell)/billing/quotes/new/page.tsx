@@ -56,7 +56,7 @@ export default async function NewQuotePage({
           methods: [],
         })}
         clients={clients}
-        catalog={serviceCatalog()}
+        catalog={await serviceCatalog()}
         cryptoReady={false}
       />
     </>

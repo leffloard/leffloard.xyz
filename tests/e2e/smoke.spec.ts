@@ -37,6 +37,24 @@ test("unknown addresses get the 404 page", async ({ page }) => {
   await expect(page).toHaveURL("/");
 });
 
+test("the 404 page runs its scripts under the page's policy, inside and outside the site's sections", async ({
+  page,
+}) => {
+  const refused: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && /Content Security Policy|Refused to/i.test(message.text())) {
+      refused.push(message.text());
+    }
+  });
+  for (const path of ["/legal/nothing-here", "/work/a/b", "/no-such-section"]) {
+    const response = await page.goto(path);
+    expect(response?.status(), path).toBe(404);
+    await expect(page.getByRole("heading", { name: "This page does not exist." })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+  }
+  expect(refused).toEqual([]);
+});
+
 test("health: the shallow check is public, the deep check needs the token", async ({ request }) => {
   const shallow = await request.get("/api/health");
   expect(shallow.status()).toBe(200);

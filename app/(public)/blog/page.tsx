@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PostList } from "@/components/site/post-list";
 import { PageIntro, Section } from "@/components/site/section";
-import { listPosts, listTags } from "@/server/content/posts";
+import { postTags } from "@/lib/content/types";
+import { pageContent } from "@/server/content/site";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default async function BlogPage() {
-  const [posts, tags] = await Promise.all([listPosts(), listTags()]);
+  const content = await pageContent();
+  const { posts } = content;
+  const tags = postTags(content);
   return (
     <>
       <PageIntro

@@ -20,4 +20,9 @@ export function boot(): void {
   log.info({ db: report.env.DB_NAME, site: report.env.SITE_URL }, "leffloard.xyz is starting");
   if (report.env.BACKGROUND_JOBS === "on") startScheduler();
   else log.info("background jobs are off (BACKGROUND_JOBS=off)");
+  // The code highlighter loads its grammars on first use, which takes seconds: done now, not during the
+  // owner's first save in the content editor.
+  void import("@/server/content/render")
+    .then(({ renderMarkdown }) => renderMarkdown("```ts\nconst ready = true;\n```"))
+    .catch((error: unknown) => log.warn({ err: error }, "markdown warm-up failed"));
 }

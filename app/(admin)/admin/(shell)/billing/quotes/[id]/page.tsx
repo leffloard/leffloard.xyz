@@ -120,7 +120,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           version={quote.version}
           initial={quoteEditorValue(quote)}
           clients={clients}
-          catalog={serviceCatalog()}
+          catalog={await serviceCatalog()}
           cryptoReady={false}
         />
       ) : (

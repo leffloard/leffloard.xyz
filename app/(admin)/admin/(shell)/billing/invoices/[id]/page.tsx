@@ -173,7 +173,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           initial={invoiceEditorValue(invoice)}
           clients={clients}
           projects={projects}
-          catalog={serviceCatalog()}
+          catalog={await serviceCatalog()}
           cryptoReady={paymentsAvailable().crypto}
         />
       ) : (

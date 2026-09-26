@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Arrow } from "@/components/site/link-button";
 import { Spotlight } from "@/components/site/spotlight";
-import type { Service } from "@/content/services";
+import type { Service } from "@/lib/content/types";
 
 export function formatPrice(amount: number): string {
   return `$${amount.toLocaleString("en-US")}`;
