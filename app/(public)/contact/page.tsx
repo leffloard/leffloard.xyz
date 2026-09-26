@@ -48,6 +48,9 @@ export default function ContactPage() {
           <LinkButton href="#write" variant="primary">
             Write to me <Arrow />
           </LinkButton>
+          <LinkButton href="/book" variant="secondary">
+            Book a call
+          </LinkButton>
           <LinkButton href={`mailto:${site.email}?subject=${subject}`} variant="secondary">
             {site.email}
           </LinkButton>

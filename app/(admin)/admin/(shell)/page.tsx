@@ -18,21 +18,23 @@ import { pendingMigrations } from "@/server/db/migrate";
 import { readEnv } from "@/server/env";
 import { DueText } from "@/components/admin/work/due-text";
 import { TaskList } from "@/components/admin/work/task-list";
-import { todayIn } from "@/lib/intake/time";
-import { dueLabel } from "@/lib/work/dates";
+import { addDays, todayIn, wallDateTime } from "@/lib/intake/time";
+import { dueLabel, formatWeekday } from "@/lib/work/dates";
 import { PROJECT_STAGE_LABELS } from "@/lib/work/options";
 import { listProjects } from "@/server/projects/store";
 import { listTasks } from "@/server/tasks/store";
 import { toTaskRow } from "@/server/tasks/view";
+import { countRequests, upcomingMeetings } from "@/server/calendar/meetings";
+import type { MeetingDoc } from "@/server/calendar/types";
 
 export const metadata = { title: "Today" };
 
 const ROADMAP = [
-  ["M6", "Calendar and booking"],
   ["M7", "Quotes, invoices, crypto and bank payments, finance"],
   ["M8", "Client portal"],
   ["M9", "Content editor for the public site, and GitHub sync"],
   ["M10", "AI assistant"],
+  ["M11", "Analytics, notification centre, command palette"],
 ] as const;
 
 function greeting(at: Date): string {
@@ -50,18 +52,31 @@ export default async function TodayPage() {
   const db = await getDb();
   const at = now();
   const today = todayIn(ADMIN_TIME_ZONE, at);
-  const [sessions, passkeys, pending, lastSignIns, newCount, latest, delivery, dueTasks, openProjects] =
-    await Promise.all([
-      listSessions(db, user._id),
-      listPasskeys(db, user._id),
-      pendingMigrations(db),
-      recentAudit(db, { prefix: "auth.login", limit: 20 }),
-      countNew(db),
-      latestInquiries(db, 5, at),
-      outboxSummary(db),
-      listTasks(db, "today", today, { limit: 12 }),
-      listProjects(db, { view: "open" }),
-    ]);
+  const [
+    sessions,
+    passkeys,
+    pending,
+    lastSignIns,
+    newCount,
+    latest,
+    delivery,
+    dueTasks,
+    openProjects,
+    meetings,
+    requests,
+  ] = await Promise.all([
+    listSessions(db, user._id),
+    listPasskeys(db, user._id),
+    pendingMigrations(db),
+    recentAudit(db, { prefix: "auth.login", limit: 20 }),
+    countNew(db),
+    latestInquiries(db, 5, at),
+    outboxSummary(db),
+    listTasks(db, "today", today, { limit: 12 }),
+    listProjects(db, { view: "open" }),
+    upcomingMeetings(db, at, 6),
+    countRequests(db, at),
+  ]);
   const channels = channelStatus();
   const profile = toPublicUser(user);
   const warnings = readEnv().warnings;
@@ -79,6 +94,8 @@ export default async function TodayPage() {
     <>
       <PageHeader title={`${greeting(at)}, ${profile.name.split(" ")[0]}`} description={date} />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <AgendaCard meetings={meetings} requests={requests} today={today} at={at} />
+
         <Card className="md:col-span-2">
           <CardHeader
             title="Inbox"
@@ -283,6 +300,87 @@ export default async function TodayPage() {
         </Card>
       </div>
     </>
+  );
+}
+
+// "Today, 17:00", "Tomorrow, 18:30", "Thu 1 Oct, 17:00", in the owner's zone.
+function meetingTime(start: Date, today: string): string {
+  const wall = wallDateTime(start, ADMIN_TIME_ZONE);
+  const day =
+    wall.date === today
+      ? "Today"
+      : wall.date === addDays(today, 1)
+        ? "Tomorrow"
+        : formatWeekday(wall.date, today);
+  return `${day}, ${wall.time}`;
+}
+
+function AgendaCard({
+  meetings,
+  requests,
+  today,
+  at,
+}: {
+  meetings: MeetingDoc[];
+  requests: number;
+  today: string;
+  at: Date;
+}) {
+  return (
+    <Card className="md:col-span-2">
+      <CardHeader
+        title="Meetings"
+        description={
+          requests
+            ? `${plural(requests, "request")} waiting for your answer.`
+            : meetings.length
+              ? "Coming up next."
+              : "Nothing booked. Share /book when a client wants to talk."
+        }
+        action={
+          <Link href="/admin/calendar" className="text-[13px] text-accent underline-offset-4 hover:underline">
+            Calendar
+          </Link>
+        }
+      />
+      {meetings.length ? (
+        <ul className="divide-y divide-line">
+          {meetings.map((meeting) => {
+            const id = meeting._id.toHexString();
+            const live = meeting.startsAt <= at;
+            return (
+              <li
+                key={id}
+                className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-2 text-[13px]"
+              >
+                <span className={`w-36 shrink-0 font-mono text-xs ${live ? "text-accent" : "text-muted"}`}>
+                  {live ? "Now" : meetingTime(meeting.startsAt, today)}
+                </span>
+                <Link
+                  href={`/admin/calendar/meetings/${id}`}
+                  className="min-w-0 flex-1 truncate hover:text-accent"
+                >
+                  <span className="font-medium">{meeting.name}</span>
+                  <span className="text-muted"> · {meeting.title}</span>
+                </Link>
+                {meeting.status === "requested" ? (
+                  <Badge tone="warning">request</Badge>
+                ) : meeting.location.url ? (
+                  <a
+                    href={meeting.location.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-xs text-accent underline-offset-4 hover:underline"
+                  >
+                    Join
+                  </a>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </Card>
   );
 }
 

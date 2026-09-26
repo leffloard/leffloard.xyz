@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Logo } from "@/components/admin/auth-frame";
-import { AdminNav } from "@/components/admin/nav";
+import { AdminNav, type NavCounts } from "@/components/admin/nav";
 import { SignOutButton } from "@/components/admin/sign-out-button";
 import { TimerWidget, type RunningTimerView } from "@/components/admin/time/timer-widget";
 
@@ -8,14 +8,12 @@ export type ShellTimer = { running: RunningTimerView | null; projects: { id: str
 
 export function AdminShell({
   user,
-  newInquiries = 0,
-  tasksDue = 0,
+  counts,
   timer,
   children,
 }: {
   user: { name: string; email: string };
-  newInquiries?: number;
-  tasksDue?: number;
+  counts?: NavCounts;
   timer?: ShellTimer;
   children: ReactNode;
 }) {
@@ -28,7 +26,7 @@ export function AdminShell({
           <span className="ml-auto font-mono text-[10px] tracking-[0.08em] text-muted uppercase">admin</span>
         </div>
         <div className="flex-1 overflow-y-auto px-2 py-3">
-          <AdminNav newInquiries={newInquiries} tasksDue={tasksDue} />
+          <AdminNav counts={counts} />
         </div>
         {timer ? (
           <div className="border-t border-line p-3">
@@ -60,7 +58,7 @@ export function AdminShell({
               Menu
             </summary>
             <div className="absolute right-0 mt-2 w-64 rounded-lg border border-line bg-surface p-2 shadow-2xl shadow-black/50">
-              <AdminNav newInquiries={newInquiries} tasksDue={tasksDue} />
+              <AdminNav counts={counts} />
               {timer ? (
                 <div className="mt-2 border-t border-line pt-2">
                   <TimerWidget running={timer.running} projects={timer.projects} compact />

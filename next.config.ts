@@ -31,7 +31,14 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer", "shiki", "@shikijs/rehype"],
   async redirects() {
     return [
-      // v1 addresses: the request form opened with ?type=..., and four template blog posts.
+      // v1 addresses: the request form opened with ?type=..., and four template blog posts. An
+      // appointment link goes to the booking page, the other types to the contact form.
+      {
+        source: "/",
+        has: [{ type: "query", key: "type", value: "appointment" }],
+        destination: "/book",
+        permanent: false,
+      },
       { source: "/", has: [{ type: "query", key: "type" }], destination: "/contact", permanent: false },
       { source: "/blog/:id(\\d+)", destination: "/blog", permanent: true },
     ];

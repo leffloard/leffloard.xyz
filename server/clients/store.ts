@@ -10,6 +10,8 @@ import {
   type ActivityKind,
   type ClientStatus,
 } from "@/lib/work/options";
+import { meetings } from "@/server/calendar/settings";
+import type { MeetingStatus } from "@/server/calendar/types";
 import type { ActivityDoc, ClientDoc } from "@/server/clients/types";
 import { now } from "@/server/clock";
 import { inTransaction } from "@/server/db/transaction";
@@ -340,11 +342,12 @@ export type TimelineEntry =
       projectRef: string;
       number: number;
       title: string;
-    };
+    }
+  | { type: "meeting"; at: Date; id: string; title: string; status: MeetingStatus };
 
 // Everything that happened with a client, newest first.
 export async function clientTimeline(db: Db, clientId: ObjectId, limit = 100): Promise<TimelineEntry[]> {
-  const [activityDocs, messageDocs, projectDocs, revisionDocs] = await Promise.all([
+  const [activityDocs, messageDocs, projectDocs, revisionDocs, meetingDocs] = await Promise.all([
     activities(db).find({ clientId }).sort({ at: -1 }).limit(limit).toArray(),
     inquiries(db)
       .find({ clientId }, { projection: { ref: 1, kind: 1, subject: 1, receivedAt: 1, replies: 1 } })
@@ -357,6 +360,11 @@ export async function clientTimeline(db: Db, clientId: ObjectId, limit = 100): P
     revisions(db)
       .find({ clientId }, { projection: { projectId: 1, number: 1, title: 1, requestedAt: 1 } })
       .sort({ requestedAt: -1 })
+      .limit(limit)
+      .toArray(),
+    meetings(db)
+      .find({ clientId }, { projection: { title: 1, startsAt: 1, status: 1 } })
+      .sort({ startsAt: -1 })
       .limit(limit)
       .toArray(),
   ]);
@@ -424,6 +432,16 @@ export async function clientTimeline(db: Db, clientId: ObjectId, limit = 100): P
       title: revision.title,
     });
   }
+  for (const meeting of meetingDocs) {
+    // Placed at the meeting's time, so the next call sits at the top.
+    entries.push({
+      type: "meeting",
+      at: meeting.startsAt,
+      id: meeting._id.toHexString(),
+      title: meeting.title,
+      status: meeting.status,
+    });
+  }
   return entries.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit);
 }
 
@@ -440,7 +458,7 @@ export async function exportClient(db: Db, clientId: ObjectId, at: Date = now())
   const inProject = {
     $or: [{ clientId }, { projectId: { $in: projectDocs.map((project) => project._id) } }],
   };
-  const [revisionDocs, taskDocs, timeDocs, activityDocs, messageDocs] = await Promise.all([
+  const [revisionDocs, taskDocs, timeDocs, activityDocs, messageDocs, meetingDocs] = await Promise.all([
     revisions(db).find(inProject).sort({ requestedAt: 1 }).toArray(),
     tasks(db)
       .find(inProject, { projection: { rank: 0 } })
@@ -452,6 +470,11 @@ export async function exportClient(db: Db, clientId: ObjectId, at: Date = now())
       .find({ clientId }, { projection: { purgeAt: 0 } })
       .sort({ receivedAt: 1 })
       .toArray(),
+    // Without the secrets of their manage links.
+    meetings(db)
+      .find({ clientId }, { projection: { manageTokenHash: 0, manageTokenSealed: 0, purgeAt: 0 } })
+      .sort({ startsAt: 1 })
+      .toArray(),
   ]);
   return {
     exportedAt: at.toISOString(),
@@ -462,6 +485,7 @@ export async function exportClient(db: Db, clientId: ObjectId, at: Date = now())
     timeEntries: timeDocs,
     log: activityDocs,
     messages: messageDocs,
+    meetings: meetingDocs,
   };
 }
 
@@ -472,10 +496,11 @@ export type DeletedClient = {
   timeEntries: number;
   log: number;
   messagesUnlinked: number;
+  meetingsUnlinked: number;
 };
 
 // Deletes a client with their projects, revision rounds, tasks, time and log, all or nothing. Their
-// inbox messages stay (they follow the inbox's own retention) but are no longer linked.
+// inbox messages and meetings stay (they follow their own retention) but are no longer linked.
 export async function deleteClient(db: Db, clientId: ObjectId): Promise<DeletedClient | null> {
   return inTransaction(db, async (session) => {
     const client = await clients(db).findOne({ _id: clientId }, { session, projection: { _id: 1 } });
@@ -494,6 +519,9 @@ export async function deleteClient(db: Db, clientId: ObjectId): Promise<DeletedC
       log: (await activities(db).deleteMany({ clientId }, { session })).deletedCount,
       messagesUnlinked: (
         await inquiries(db).updateMany({ clientId }, { $set: { clientId: null } }, { session })
+      ).modifiedCount,
+      meetingsUnlinked: (
+        await meetings(db).updateMany({ clientId }, { $set: { clientId: null } }, { session })
       ).modifiedCount,
     };
     await clients(db).deleteOne({ _id: clientId }, { session });

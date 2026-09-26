@@ -21,7 +21,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /admin-(inbox|settings|work)\.spec\.ts/,
+      testIgnore: /(admin-(inbox|settings|work)|calendar)\.spec\.ts/,
       use: chromium,
     },
     {
@@ -37,6 +37,13 @@ export default defineConfig({
       name: "admin-work",
       testMatch: /admin-work\.spec\.ts/,
       dependencies: ["admin-modules"],
+      use: chromium,
+    },
+    {
+      // Booking and the calendar: last, as they reset the calendar's hours and booking types.
+      name: "calendar",
+      testMatch: /calendar\.spec\.ts/,
+      dependencies: ["admin-work"],
       use: chromium,
     },
   ],

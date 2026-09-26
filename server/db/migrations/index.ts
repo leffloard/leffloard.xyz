@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { Db } from "mongodb";
 
 export type Migration = {
@@ -116,6 +117,73 @@ export const migrations: Migration[] = [
       await db
         .collection("inquiries")
         .createIndex({ clientId: 1 }, { partialFilterExpression: { clientId: { $type: "objectId" } } });
+    },
+  },
+  {
+    id: "0006",
+    name: "calendar-and-booking",
+    async up(db) {
+      const expires = { expireAfterSeconds: 0 };
+      const types = db.collection("booking_types");
+      await types.createIndex({ slug: 1 }, { unique: true });
+      await types.createIndex({ rank: 1 });
+
+      const meetings = db.collection("meetings");
+      // The guest's reschedule-and-cancel link finds its meeting by the secret's hash.
+      await meetings.createIndex({ manageTokenHash: 1 }, { unique: true });
+      await meetings.createIndex({ status: 1, startsAt: 1 });
+      await meetings.createIndex({ startsAt: 1 });
+      await meetings.createIndex({ clientId: 1, startsAt: -1 });
+      await meetings.createIndex({ purgeAt: 1 }, expires);
+
+      await db.collection("calendar_blocks").createIndex({ startsAt: 1, endsAt: 1 });
+      // A slot lock's id is its 15-minute cell, so a cell can be held by one meeting only.
+      await db.collection("slot_locks").createIndex({ meetingId: 1 });
+      await db.collection("slot_locks").createIndex({ expiresAt: 1 }, expires);
+      await db.collection("booking_days").createIndex({ expiresAt: 1 }, expires);
+
+      // Two booking types to start with; the owner edits them in the admin.
+      if ((await types.countDocuments({}, { limit: 1 })) === 0) {
+        const at = new Date();
+        const jitsi = { kind: "jitsi", details: "" };
+        await types.insertMany([
+          {
+            slug: "intro-call",
+            title: "Intro call",
+            description:
+              "A first talk about your project: what it should do, the timeline and a rough budget. Free, in English or Turkish.",
+            durationMinutes: 30,
+            visibility: "public",
+            requiresApproval: false,
+            location: jitsi,
+            questions: [{ id: "q-intro-1", label: "What would you like to build?", required: true }],
+            linkKey: null,
+            active: true,
+            rank: "a0",
+            createdAt: at,
+            updatedAt: at,
+          },
+          {
+            slug: "project-check-in",
+            title: "Project check-in",
+            description:
+              "For clients with a project under way: a demo, feedback or a decision that needs a talk.",
+            durationMinutes: 45,
+            visibility: "secret",
+            requiresApproval: false,
+            location: jitsi,
+            questions: [
+              { id: "q-check-in-1", label: "Which project, and what should we cover?", required: true },
+            ],
+            // A secret type's link carries this key; the slug alone (public in this repository) is not enough.
+            linkKey: randomBytes(16).toString("base64url"),
+            active: true,
+            rank: "a1",
+            createdAt: at,
+            updatedAt: at,
+          },
+        ]);
+      }
     },
   },
 ];

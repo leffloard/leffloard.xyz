@@ -25,6 +25,13 @@ import { parseId } from "@/server/work/collections";
 
 export const metadata = { title: "Client" };
 
+const MEETING_LABELS = {
+  requested: "Call request",
+  confirmed: "Call",
+  declined: "Call declined",
+  cancelled: "Call cancelled",
+} as const;
+
 function TimelineItem({ entry, at }: { entry: TimelineEntry; at: Date }) {
   const when = (
     <time className="shrink-0 text-xs text-muted" title={formatDateTime(entry.at)}>
@@ -91,6 +98,23 @@ function TimelineItem({ entry, at }: { entry: TimelineEntry; at: Date }) {
             {entry.title}
           </Link>
           <span className="font-mono text-[11px] text-muted">{entry.projectRef}</span>
+          {when}
+        </p>
+      );
+    case "meeting":
+      return (
+        <p className="flex flex-wrap items-center gap-2 text-[13px]">
+          <Badge
+            tone={
+              entry.status === "requested" ? "warning" : entry.status === "confirmed" ? "accent" : "neutral"
+            }
+          >
+            {MEETING_LABELS[entry.status]}
+          </Badge>
+          <Link href={`/admin/calendar/meetings/${entry.id}`} className="min-w-0 truncate hover:text-accent">
+            {entry.title}
+          </Link>
+          <span className="text-xs text-muted">{formatDateTime(entry.at)}</span>
           {when}
         </p>
       );
@@ -169,6 +193,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             <ClientStatusSelect id={hexId} status={client.status} />
             <Link href={`/admin/clients/${hexId}/edit`} className={buttonClasses("secondary", "sm")}>
               Edit
+            </Link>
+            <Link href={`/admin/calendar/new?client=${hexId}`} className={buttonClasses("secondary", "sm")}>
+              New meeting
             </Link>
             <Link href={`/admin/projects/new?client=${hexId}`} className={buttonClasses("primary", "sm")}>
               New project

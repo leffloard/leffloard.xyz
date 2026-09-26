@@ -53,6 +53,12 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
   `lib/money.ts`. Calendar dates are `YYYY-MM-DD` strings in the owner's time zone; instants are `Date`s.
 - Admin form fields are parsed with the zod helpers in `lib/forms.ts` (they clean text like the contact form
   does). Ordered lists store a rank from `lib/rank.ts`, placed with `rankFor()` in `server/db/ordering.ts`.
+- Meetings are created, moved and ended only through `server/calendar/meetings.ts`, which writes the
+  meeting, its 15-minute cell locks and the day's count in one transaction. Never insert or delete meetings
+  or `slot_locks` elsewhere. Open times come from `openSlots()`; a public booking must be one of them.
+- A guest's manage link is a secret: store only `hashToken()` and the sealed copy, never log the link or keep
+  it in other records (the development-only `EMAIL_DELIVERY=log` prints whole emails, links included), and
+  keep `/meeting/` pages noindex with no referrer. A secret booking type is found only with its `linkKey`.
 - Every change comes with tests. Unit tests need no database; integration tests use the throwaway replica set
   from `tests/integration/global-setup.ts`.
 - Content scope: no case studies, marketing copy or pricing for game-modification projects or cheat loaders.

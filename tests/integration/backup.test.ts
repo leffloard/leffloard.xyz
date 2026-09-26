@@ -77,7 +77,8 @@ describe("backups", () => {
       at: new Date("2026-09-26T03:15:00Z"),
     });
     expect(result.name).toBe(`leffloard-${db().databaseName}-20260926T031500Z.lfbak`);
-    expect(result.collections).toMatchObject({ users: 1, passkeys: 1, notes: 1200 });
+    // The booking types are the two that migration 0006 creates.
+    expect(result.collections).toMatchObject({ users: 1, passkeys: 1, notes: 1200, booking_types: 2 });
     expect(result.collections).not.toHaveProperty("sessions");
     expect(result.collections).not.toHaveProperty("rate_limits");
     expect(result.collections).not.toHaveProperty("schema_migrations");
@@ -91,7 +92,7 @@ describe("backups", () => {
     try {
       const report = await restoreInto(target, backup, { replace: false });
       expect(report.matches).toBe(true);
-      expect(report.documents).toBe(1202);
+      expect(report.documents).toBe(1204);
     } finally {
       await backup.close();
     }

@@ -14,6 +14,8 @@ const PAGES = [
   "/about",
   "/cv",
   "/contact",
+  "/book",
+  "/book/intro-call",
   "/blog",
   "/blog/how-this-site-signs-me-in",
   "/blog/tags/security",
@@ -109,9 +111,13 @@ test("old v1 addresses redirect", async ({ request }) => {
   expect(oldPost.status()).toBe(308);
   expect(oldPost.headers().location).toBe("/blog");
 
-  const oldForm = await request.get("/?type=appointment", { maxRedirects: 0 });
+  // A call request now goes to the booking page; the other request types to the contact form.
+  const oldCall = await request.get("/?type=appointment", { maxRedirects: 0 });
+  expect(oldCall.status()).toBe(307);
+  expect(oldCall.headers().location).toBe("/book?type=appointment");
+  const oldForm = await request.get("/?type=project", { maxRedirects: 0 });
   expect(oldForm.status()).toBe(307);
-  expect(oldForm.headers().location).toBe("/contact?type=appointment");
+  expect(oldForm.headers().location).toBe("/contact?type=project");
 });
 
 test.describe("missing pages", () => {

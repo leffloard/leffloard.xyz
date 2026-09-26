@@ -4,6 +4,7 @@ import { ADMIN_TIME_ZONE } from "@/lib/format";
 import { todayIn } from "@/lib/intake/time";
 import { requireAdmin } from "@/server/auth/dal";
 import { listPasskeys } from "@/server/auth/passkeys";
+import { countRequests } from "@/server/calendar/meetings";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
 import { countNew } from "@/server/inquiries/store";
@@ -17,10 +18,11 @@ export default async function ShellLayout({ children }: { children: React.ReactN
   const { user } = await requireAdmin();
   const db = await getDb();
   const at = now();
-  const [passkeys, newInquiries, tasks, running, projects] = await Promise.all([
+  const [passkeys, newInquiries, tasks, requests, running, projects] = await Promise.all([
     listPasskeys(db, user._id),
     countNew(db),
     taskCounts(db, todayIn(ADMIN_TIME_ZONE, at)),
+    countRequests(db, at),
     runningTimer(db),
     projectChoices(db),
   ]);
@@ -40,8 +42,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
     <SudoProvider hasPasskeys={passkeys.length > 0}>
       <AdminShell
         user={{ name: user.name, email: user.email }}
-        newInquiries={newInquiries}
-        tasksDue={tasks.today}
+        counts={{ inbox: newInquiries, tasks: tasks.today, calendar: requests }}
         timer={timer}
       >
         {children}

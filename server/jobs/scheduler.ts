@@ -1,8 +1,11 @@
 import "server-only";
 import { Cron } from "croner";
 import { runBackup } from "@/server/backup/service";
+import { sendReminders } from "@/server/calendar/booking";
 import { getDb } from "@/server/db/client";
+import { getEnv } from "@/server/env";
 import { log } from "@/server/log";
+import { readChannels } from "@/server/notify/channels";
 import { drainOutbox } from "@/server/notify/outbox";
 
 // Background work inside the web server process, started once from instrumentation.ts. Every job is safe
@@ -28,6 +31,19 @@ const JOBS: Job[] = [
     run: async () => {
       const outcome = await runBackup(await getDb(), { now: false });
       if (outcome?.ran) log.info({ ok: outcome.ok, result: outcome.message }, "nightly backup");
+    },
+  },
+  {
+    // Reminds guests of a meeting about a day before. Each reminder is claimed first, so it goes out once.
+    name: "meeting-reminders",
+    pattern: "*/10 * * * *",
+    run: async () => {
+      const sent = await sendReminders(await getDb(), {
+        siteUrl: getEnv().SITE_URL,
+        channels: readChannels(),
+      });
+      // The outbox job sends them within a minute.
+      if (sent) log.info({ sent }, "meeting reminders queued");
     },
   },
 ];

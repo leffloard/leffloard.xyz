@@ -328,6 +328,7 @@ describe("timeline, export and delete", () => {
       timeEntries: 2,
       log: 1,
       messagesUnlinked: 1,
+      meetingsUnlinked: 0,
     });
     expect(await getClient(db(), client._id)).toBeNull();
     expect((await getInquiry(db(), message._id))?.clientId).toBeNull();

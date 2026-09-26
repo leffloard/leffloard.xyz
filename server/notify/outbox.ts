@@ -18,7 +18,8 @@ export type OutboxItem =
 
 export type OutboxStatus = "pending" | "sending" | "sent" | "failed" | "skipped";
 
-export type OutboxRef = { inquiryId: ObjectId; replyId?: string };
+// What a message is about: an inbox message (and the reply it carries), or a meeting.
+export type OutboxRef = { inquiryId?: ObjectId; replyId?: string; meetingId?: ObjectId };
 
 export type OutboxDoc = OutboxItem & {
   _id: ObjectId;
@@ -94,7 +95,7 @@ async function syncReply(
   item: OutboxDoc,
   update: { delivery: Delivery; sentAt?: Date | null; error: string | null },
 ): Promise<void> {
-  if (!item.ref?.replyId) return;
+  if (!item.ref?.replyId || !item.ref.inquiryId) return;
   const set: Record<string, unknown> = {
     "replies.$[reply].delivery": update.delivery,
     "replies.$[reply].error": update.error,

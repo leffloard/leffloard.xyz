@@ -27,15 +27,18 @@ export function SiteFooter() {
         <nav aria-label="Footer" className="md:col-span-3">
           <p className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">Site</p>
           <ul className="mt-4 grid gap-2 text-sm">
-            {[...navigation, { href: "/cv", label: "CV" }, { href: "/contact", label: "Contact" }].map(
-              (item) => (
-                <li key={item.href}>
-                  <Link href={item.href} className="text-ink/80 hover:text-ink">
-                    {item.label}
-                  </Link>
-                </li>
-              ),
-            )}
+            {[
+              ...navigation,
+              { href: "/cv", label: "CV" },
+              { href: "/contact", label: "Contact" },
+              { href: "/book", label: "Book a call" },
+            ].map((item) => (
+              <li key={item.href}>
+                <Link href={item.href} className="text-ink/80 hover:text-ink">
+                  {item.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
         <div className="md:col-span-4">

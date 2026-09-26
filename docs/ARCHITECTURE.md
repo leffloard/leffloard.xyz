@@ -5,20 +5,25 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M5, the work itself: clients, projects, tasks,
-revision rounds and time tracking**.
+This document grows with each milestone. Current state: **M6, the calendar: booking calls, meetings, blocks,
+the owner's hours and a private calendar feed**.
 
 ## Layout
 
 ```text
 app/                      Routes (App Router)
   (public)/               Public site, with its own root layout: home, work, services, pricing, about, cv,
-                          blog, contact, legal pages, colophon; OG images, cv.pdf and the RSS feed
+                          blog, contact, book, legal pages, colophon; OG images, cv.pdf and the RSS feed
+    meeting/[token]/      A guest's own page for their meeting (reschedule, cancel, invite.ics)
   sitemap.ts, robots.ts   Machine-readable files (plus manifest.ts and .well-known/security.txt)
   (admin)/admin/          Admin, with its own root layout (dynamic, noindex)
     login/, setup/        Sign-in, two-step check, first-time authenticator setup
-    (shell)/              Signed-in pages: Today, Inbox, Tasks, Projects, Clients, Time, Security, Settings
+    (shell)/              Signed-in pages: Today, Inbox, Calendar, Tasks, Projects, Clients, Time, Security,
+                          Settings
   api/inquiries/route.ts  The contact form's endpoint
+  api/bookings/           Booking a call, and the open times of a booking type
+  api/meetings/[token]/   The guest's link: open times, reschedule, cancel
+  api/calendar/feed/      The owner's private calendar feed (iCalendar)
   api/requests/route.ts   The v1 form API, same contract as v1 (kept until the legacy code is removed)
   api/[[...path]]/        JSON 404 for unknown API addresses
   api/health/route.ts     Health check (shallow and deep)
@@ -31,6 +36,8 @@ lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, C
                           (integer minor units), ranks for ordered lists, durations, admin form schemas
   intake/                 The form rules shared by browser and server (ported from the v1 backend)
   work/                   Choices and calendar-date rules of the work modules (stages, due dates, repeats)
+  booking/                The owner's hours and their rules, the slot engine, iCalendar output, the booking
+                          form's rules
 server/                   Server-only code (every file imports "server-only")
   env.ts                  Validated configuration, plain-English errors
   boot.ts                 Runs once at start-up (via instrumentation.ts); stops on bad config
@@ -46,6 +53,8 @@ server/                   Server-only code (every file imports "server-only")
   clients/                Clients, their log and timeline, linking inbox messages, export and delete
   projects/               Projects, milestones, links, revision rounds
   tasks/, time/           Tasks (lists, board, checklists, repeats) and time entries (the one running timer)
+  calendar/               Hours and the feed's secret, booking types, meetings and their slot locks, blocks,
+                          the booking flows for guests and the owner, their emails, the feed
   work/collections.ts     The work modules' collections, so their stores do not import each other
   notify/                 Notification channels, templates, escaping, the outbox, SMTP and Discord senders
   jobs/                   Background jobs inside the server process (croner), with once-per-period runs
@@ -302,6 +311,59 @@ The admin's daily work (M5). Every change goes through `adminAction()`; stores i
 - **Money** is an integer amount of minor units with its currency (`lib/money.ts`); formatting, parsing and
   rounding happen only there.
 
+## Calendar and booking
+
+Calls with clients (M6): visitors book them at `/book`, the owner runs them from the admin's Calendar.
+`lib/booking` holds the pure rules; `server/calendar` is the only code that touches the calendar's
+collections.
+
+- **Hours.** Weekly hours in the owner's time zone (Europe/Istanbul; up to four ranges a day), special dates
+  with other hours or none, and the rules: a gap after each meeting, the notice needed, how far ahead, start
+  times every 15, 30 or 60 minutes, and a daily limit. The defaults fit a school week: weekday evenings, a
+  longer Saturday, Sundays off. Blocks (school, an exam, focus time, away) keep any stretch of time free,
+  with the gap after them like a meeting's.
+  The hours are saved with a `version`, so a second tab cannot silently undo a change.
+- **The slot engine** (`lib/booking/slots.ts`) works in the owner's wall clock and turns each open range
+  into instants per day, so a day that changes its clocks still offers the right hours. Every time starts on
+  a 15-minute cell. The visitor sees the times in their own zone, found in the browser and changeable.
+- **No double booking, by construction.** A meeting holds the 15-minute cells from its start to its end plus
+  the gap, as documents in `slot_locks` whose `_id` is the cell. They are inserted in the same transaction as
+  the meeting, so a second booking of any of those cells fails on the unique key, however close together the
+  two requests arrive. The daily limit is a counter per day in `booking_days`, raised by a conditional upsert
+  in the same transaction. Moving a meeting swaps its cells in one transaction; declining or cancelling
+  frees them. The integration tests race six bookings for one time (one wins) and five for a limit of two.
+- **Booking types** (an intro call, a project check-in) have their own link, a length, public or secret
+  (the link carries a random key, which the owner can replace; the address alone finds nothing), an optional
+  approval step (the time is held until the owner answers, and its invite is tentative), where the call happens
+  (a Jitsi Meet room made per meeting with an unguessable name, Discord, or anything else) and up to five
+  questions. A meeting keeps its own copy of the title and length, so changing or deleting a type does not
+  change booked calls.
+- **The guest's link.** Each booking has a 256-bit secret. The meeting stores only its SHA-256, for lookups,
+  and a copy sealed with AES-256-GCM (the data key, bound to the meeting's id), so later emails can carry the
+  link. The emails themselves stay in the outbox's delivery log for 30 days, which backups leave out, and the
+  answer kept for a repeated booking request holds the meeting's id, not the link. The link's page lets the
+  guest reschedule to an open time or cancel until the call starts; it is noindex, sends no referrer, and runs
+  under the nonce CSP.
+- **Emails with calendar invites.** Confirmations, changes and cancellations carry an iCalendar invite
+  (RFC 5545: escaped and folded lines, a stable UID, `SEQUENCE` raised on every change, `METHOD:CANCEL` on a
+  cancellation, also when a request is declined), so the guest's calendar updates the same event. One reminder
+  goes out within the day before the call (not in its last hour), unless the call was booked or moved in the
+  last 12 hours or the owner set it up without emailing the guest. The owner is told by email or Discord.
+  Everything goes through the outbox with a `dedupeKey`.
+- **The admin.** A week grid (an agenda on phones) with meetings, requests, blocks and deadlines, the owner's
+  open hours shaded; the requests waiting for an answer; a page per meeting (confirm, decline with a note,
+  move, cancel, a private note, the client it belongs to); meetings set up by the owner, which may fall
+  outside the bookable hours but never overlap another; the hours editor and the booking types. The sidebar
+  counts the requests waiting, Today lists the next calls with their join links, and a client's timeline
+  shows their calls.
+- **The feed.** A private iCalendar feed of meetings, blocks, and task, project and milestone deadlines,
+  for Google Calendar, Apple Calendar or Outlook. Its address holds a secret (only its hash is stored); it
+  is shown once, and can be replaced or turned off (both ask to confirm it's you).
+- **Abuse and retention.** Bookings are rate-limited per address before anything is looked up (5 per 10
+  minutes; the guest's link 20; open times 60 a minute), and use Turnstile, a hidden field for bots and an
+  idempotency key. Meetings are deleted
+  24 months after they end (a TTL index); cell locks and day counters expire a day after the meeting.
+
 ## Operations
 
 The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
@@ -341,7 +403,8 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
 - Every public page is checked with axe (WCAG 2.2 AA) in both themes, and for horizontal overflow at 360px;
   the admin's pages are checked with axe as the tests go through them.
 - Admin tests that share data run in order: the sign-in tests, then the inbox and settings, then the work
-  modules (Playwright project dependencies in `playwright.config.ts`).
+  modules, then booking and the calendar (Playwright project dependencies in `playwright.config.ts`). The
+  calendar tests book as visitors in London and New York, and check the invites the emails carry.
 - Offline machines can use local binaries: `MONGOMS_SYSTEM_BINARY=/path/to/mongod`,
   `PW_CHROMIUM_PATH=/path/to/chrome`.
 
@@ -430,3 +493,12 @@ Every direct dependency and why it is here.
     unique" a unique index with a transaction, so no race between two tabs can break them.
 18. **Money as integer minor units with the currency** on every amount, and one module for its arithmetic,
     so no float ever reaches an invoice (M7) and amounts in different currencies are never added.
+19. **Double booking is prevented by a unique key, not by a check.** Reading the open times and then
+    inserting a meeting would let two bookings through at the same moment; one document per 15-minute cell,
+    inserted in the meeting's transaction, makes the database refuse the second.
+20. **Jitsi links and an iCalendar feed instead of the Google Calendar and Meet APIs.** They cost nothing,
+    need no OAuth tokens kept on the server, and no Google account from the guest; the owner still sees
+    everything in the calendar app of their choice.
+21. **The guest's link is stored as a hash and a sealed copy.** The hash finds the meeting; the sealed copy
+    lets reminders and change emails include the link, and a leaked meeting record or backup does not give
+    away the link.

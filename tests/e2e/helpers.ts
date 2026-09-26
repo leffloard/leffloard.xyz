@@ -85,6 +85,9 @@ export async function clearIntakeLimits(): Promise<void> {
 
 // WCAG 2.2 AA problems on the page, as "rule: selectors" lines (an empty list passes).
 export async function axeViolations(page: Page): Promise<string[]> {
+  // After a client-side navigation (a redirect from a server action, say) the new page's <title> can land
+  // just after its content, as metadata is streamed: wait for it rather than report a title that is coming.
+  await page.waitForFunction(() => document.title.trim().length > 0);
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();

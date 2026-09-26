@@ -86,6 +86,25 @@ v1 data is only read, never changed.
 - **Time**: the timer is in the sidebar (one runs at a time); the **Time** page is the week's timesheet, where
   you can also add time by hand.
 
+### Calls and the calendar
+
+- **Booking page**: `/book` lists the calls anyone can book; each type has its own link, such as
+  `/book/intro-call`. Visitors pick a time in their own time zone and get a confirmation email with a
+  calendar invite and a link to reschedule or cancel. Video calls use Jitsi Meet (free, no account needed);
+  the room's link is in the invite. Emails need email delivery set up (see the inbox above).
+- **Your hours**: **Calendar → Hours, rules and the calendar feed** sets the weekly hours, special dates, the
+  gap after each call, the notice you need, how far ahead people can book and a daily limit. Blocks on the
+  Calendar page (school, an exam, a trip) keep time free.
+- **Booking types** (**Calendar → Booking types**): length, where the call happens, up to five questions,
+  and two switches: *Only people you send the link to* (for existing clients: copy the link from the type's
+  card; **New link** retires the old one) and *I confirm each booking first*. Requests wait in the Calendar
+  until you confirm or decline them; the sidebar shows how many.
+- **Your own meetings**: **New meeting** on the Calendar or a client's page. It is confirmed at once, and the
+  guest can get the invite by email.
+- **In your calendar app**: turn on the calendar feed and subscribe to its address in Google Calendar (Other
+  calendars → From URL), Apple Calendar or Outlook. It shows meetings, blocks and deadlines. Make a new
+  address if the old one leaks.
+
 ### Useful commands
 
 | Command | What it does |

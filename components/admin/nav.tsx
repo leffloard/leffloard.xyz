@@ -4,14 +4,30 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/components/ui/cn";
 
-const ITEMS = [
+export type NavCounts = { inbox: number; tasks: number; calendar: number };
+
+type Item = { href: string; label: string; icon: string; count?: { key: keyof NavCounts; label: string } };
+
+const ITEMS: Item[] = [
   { href: "/admin", label: "Today", icon: "M4 6h12M4 10h12M4 14h7" },
   {
     href: "/admin/inbox",
     label: "Inbox",
     icon: "M3 11l2.2-5.7A1.5 1.5 0 016.6 4.3h6.8a1.5 1.5 0 011.4 1L17 11v4.2a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 15.2zM3 11h4l1 2h4l1-2h4",
+    count: { key: "inbox", label: " new" },
   },
-  { href: "/admin/tasks", label: "Tasks", icon: "M4 4.5h12v11H4zM7 10l2 2 4-4.5" },
+  {
+    href: "/admin/calendar",
+    label: "Calendar",
+    icon: "M4 5.5h12v10.5H4zM4 8.5h12M7.5 3.5v3M12.5 3.5v3",
+    count: { key: "calendar", label: " waiting for an answer" },
+  },
+  {
+    href: "/admin/tasks",
+    label: "Tasks",
+    icon: "M4 4.5h12v11H4zM7 10l2 2 4-4.5",
+    count: { key: "tasks", label: " due" },
+  },
   {
     href: "/admin/projects",
     label: "Projects",
@@ -35,16 +51,16 @@ const ITEMS = [
   },
 ];
 
-export function AdminNav({ newInquiries = 0, tasksDue = 0 }: { newInquiries?: number; tasksDue?: number }) {
+const NO_COUNTS: NavCounts = { inbox: 0, tasks: 0, calendar: 0 };
+
+export function AdminNav({ counts = NO_COUNTS }: { counts?: NavCounts }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Admin">
       <ul className="grid gap-0.5">
         {ITEMS.map((item) => {
           const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
-          const count =
-            item.href === "/admin/inbox" ? newInquiries : item.href === "/admin/tasks" ? tasksDue : 0;
-          const countLabel = item.href === "/admin/inbox" ? " new" : " due";
+          const count = item.count ? counts[item.count.key] : 0;
           return (
             <li key={item.href}>
               <Link
@@ -71,7 +87,7 @@ export function AdminNav({ newInquiries = 0, tasksDue = 0 }: { newInquiries?: nu
                 {count > 0 ? (
                   <span className="ml-auto rounded-full bg-accent px-1.5 font-mono text-[10px] leading-4 font-semibold text-accent-ink">
                     {count > 99 ? "99+" : count}
-                    <span className="sr-only">{countLabel}</span>
+                    <span className="sr-only">{item.count?.label}</span>
                   </span>
                 ) : null}
               </Link>

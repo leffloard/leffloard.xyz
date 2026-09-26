@@ -56,5 +56,9 @@ export const sendEmail: MailSender = async (message, config) => {
     replyTo: message.replyTo ? address(message.replyTo) : undefined,
     subject: message.subject,
     text: message.text,
+    // Sent as a text/calendar part and as an attachment, which calendar-aware mail apps turn into an invite.
+    icalEvent: message.calendar
+      ? { method: message.calendar.method, filename: "invite.ics", content: message.calendar.content }
+      : undefined,
   });
 };

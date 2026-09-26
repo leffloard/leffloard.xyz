@@ -69,8 +69,8 @@ export default async function HomePage() {
             <LinkButton href="/contact">
               Start a project <Arrow />
             </LinkButton>
-            <LinkButton href="/work" variant="secondary">
-              See the work
+            <LinkButton href="/book" variant="secondary">
+              Book a call
             </LinkButton>
           </div>
         </div>

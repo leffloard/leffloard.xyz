@@ -28,6 +28,9 @@ export function CtaBand() {
           <LinkButton href="/contact">
             Start a project <Arrow />
           </LinkButton>
+          <LinkButton href="/book" variant="secondary">
+            Book a call
+          </LinkButton>
           <a
             href={`mailto:${site.email}`}
             className="text-sm text-muted underline-offset-4 hover:text-ink hover:underline"

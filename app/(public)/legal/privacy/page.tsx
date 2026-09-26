@@ -29,6 +29,10 @@ export default function PrivacyPage() {
           whatever you write about your project.
         </li>
         <li>
+          <strong>Call bookings</strong>: your name, email address and time zone, the time you chose, and your
+          answers to the booking&apos;s questions.
+        </li>
+        <li>
           <strong>Client records</strong> once we work together: your contact details, notes on our calls,
           emails and meetings, the project&apos;s tasks, revision requests and the time spent on it, and
           quotes, invoices and payments.
@@ -46,6 +50,10 @@ export default function PrivacyPage() {
       <ul>
         <li>To answer your inquiry and prepare a quote: steps before a contract, at your request.</li>
         <li>
+          To hold a call you booked, and send you its invite, changes and a reminder: steps before a contract,
+          or the contract itself, at your request.
+        </li>
+        <li>
           To deliver and invoice a project: performance of a contract, and legal obligations for accounting.
         </li>
         <li>To keep the site secure: my legitimate interest in preventing abuse.</li>
@@ -54,8 +62,14 @@ export default function PrivacyPage() {
       <p>These services process data on my behalf. Some of them store or process data outside Turkey.</p>
       <ul>
         <li>MongoDB Atlas: the database that stores inquiries and client records.</li>
-        <li>Google (Gmail): email.</li>
-        <li>Discord: private notifications to me about new messages.</li>
+        <li>
+          Google (Gmail, Google Calendar): email, and my own calendar, which shows the calls booked with me.
+        </li>
+        <li>Discord: private notifications to me about new messages and bookings.</li>
+        <li>
+          Jitsi Meet (meet.jit.si, run by 8x8): our video calls. The room&apos;s link is made on this site and
+          nothing from your booking is sent to Jitsi, but it carries the call itself.
+        </li>
         <li>
           Anthropic (Claude): only when I use an AI assistant to sort messages or draft replies, and never for
           a message whose sender ticked &ldquo;Don&apos;t use AI tools on my message&rdquo;.
@@ -66,9 +80,9 @@ export default function PrivacyPage() {
       <h2>How long I keep it</h2>
       <p>
         Inquiries that do not become a project are deleted after 24 months without contact, and messages
-        marked as spam after 30 days. Copies of the emails the site sends are kept for 30 days to check they
-        arrived. Client records and invoices are kept for as long as Turkish tax and commercial law requires.
-        Security logs are kept for up to 12 months.
+        marked as spam after 30 days. Call bookings are deleted 24 months after the call. Copies of the emails
+        the site sends are kept for 30 days to check they arrived. Client records and invoices are kept for as
+        long as Turkish tax and commercial law requires. Security logs are kept for up to 12 months.
       </p>
       <h2>Your rights</h2>
       <p>

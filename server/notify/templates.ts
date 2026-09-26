@@ -18,7 +18,14 @@ import { DISCORD_DESCRIPTION_LIMIT, discordSafe, headerText, truncate } from "@/
 // Visitor text is untrusted: Discord text goes through discordSafe(), header text through headerText().
 
 export type Mailbox = { name?: string; address: string };
-export type EmailMessage = { to: Mailbox[]; replyTo?: Mailbox; subject: string; text: string };
+// `calendar` attaches an iCalendar invite (a meeting's REQUEST, or its CANCEL) that mail apps show as one.
+export type EmailMessage = {
+  to: Mailbox[];
+  replyTo?: Mailbox;
+  subject: string;
+  text: string;
+  calendar?: { method: "REQUEST" | "CANCEL"; content: string };
+};
 
 export type DiscordField = { name: string; value: string; inline: boolean };
 export type DiscordEmbed = {
@@ -73,7 +80,7 @@ const STATUS_WORDS: Record<VisitorStatus, string> = {
 };
 
 // Discord refuses embeds larger than this in total.
-const DISCORD_EMBED_TOTAL = 6000;
+export const DISCORD_EMBED_TOTAL = 6000;
 
 export function inboxUrl(siteUrl: string, inquiry: Pick<InquiryDoc, "_id">): string {
   return `${siteUrl}/admin/inbox/${inquiry._id.toHexString()}`;
@@ -87,7 +94,7 @@ function callStart(call: CallSlot): Date | null {
   return zonedInstant(call.date, call.time, call.timeZone);
 }
 
-function embedSize(embed: DiscordEmbed): number {
+export function embedSize(embed: DiscordEmbed): number {
   return (
     embed.title.length +
     embed.description.length +

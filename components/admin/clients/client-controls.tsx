@@ -206,8 +206,8 @@ export function ClientPrivacyCard({ id, name }: { id: string; name: string }) {
         {message && !error ? <Notice tone={message.tone}>{message.text}</Notice> : null}
         <div className="grid gap-1.5">
           <p className="text-muted">
-            A JSON file with everything stored about {name}: details, log, projects, rounds, tasks, time and
-            their inbox messages.
+            A JSON file with everything stored about {name}: details, log, projects, rounds, tasks, time,
+            meetings and their inbox messages.
           </p>
           <div>
             <Button size="sm" pending={pending === "export"} onClick={exportData}>
@@ -220,7 +220,8 @@ export function ClientPrivacyCard({ id, name }: { id: string; name: string }) {
             <>
               <p>
                 This deletes {name} with their projects, revision rounds, tasks, time and log. Their inbox
-                messages stay (unlinked) until the inbox deletes them. It can&apos;t be undone.
+                messages and meetings stay (unlinked) until their own retention deletes them. It can&apos;t be
+                undone.
               </p>
               <label htmlFor="client-delete-confirm" className="font-medium">
                 Type the client&apos;s name to confirm
