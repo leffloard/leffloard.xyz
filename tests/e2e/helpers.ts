@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
+import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Page } from "@playwright/test";
 import { MongoClient, type Db } from "mongodb";
 import { base32Decode } from "@/lib/base32";
@@ -79,5 +80,15 @@ export async function signInOwner(context: BrowserContext): Promise<void> {
 export async function clearIntakeLimits(): Promise<void> {
   await withDb((db) =>
     db.collection<{ _id: string }>("rate_limits").deleteMany({ _id: { $regex: "^intake:" } }),
+  );
+}
+
+// WCAG 2.2 AA problems on the page, as "rule: selectors" lines (an empty list passes).
+export async function axeViolations(page: Page): Promise<string[]> {
+  const result = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+    .analyze();
+  return result.violations.map(
+    (violation) => `${violation.id}: ${violation.nodes.map((node) => node.target).join(" ")}`,
   );
 }

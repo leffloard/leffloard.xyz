@@ -49,6 +49,10 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
   (`server/notify/escape.ts`), and show it in the admin as plain text. The webhook address is a secret.
 - Form rules live in `lib/intake/` and run in both the browser and the server; the v1 API's messages and
   status codes stay exactly as `tests/legacy-parity.md` describes.
+- Money is `{ amountMinor, currency }` (whole minor units); parse, format and calculate it only with
+  `lib/money.ts`. Calendar dates are `YYYY-MM-DD` strings in the owner's time zone; instants are `Date`s.
+- Admin form fields are parsed with the zod helpers in `lib/forms.ts` (they clean text like the contact form
+  does). Ordered lists store a rank from `lib/rank.ts`, placed with `rankFor()` in `server/db/ordering.ts`.
 - Every change comes with tests. Unit tests need no database; integration tests use the throwaway replica set
   from `tests/integration/global-setup.ts`.
 - Content scope: no case studies, marketing copy or pricing for game-modification projects or cheat loaders.

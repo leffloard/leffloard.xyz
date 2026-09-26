@@ -2,9 +2,11 @@ import "server-only";
 import type { Db } from "mongodb";
 import type { InquiryInput } from "@/lib/intake/form";
 import { ipKey } from "@/lib/ip";
+import { linkToKnownClient } from "@/server/clients/store";
 import { isBlocked } from "@/server/inquiries/blocklist";
 import { insertInquiry } from "@/server/inquiries/store";
 import type { InquiryDoc, InquirySource } from "@/server/inquiries/types";
+import { log } from "@/server/log";
 import { readChannels, type Channels } from "@/server/notify/channels";
 import { enqueue } from "@/server/notify/outbox";
 import { discordPayload, ownerAlertEmail } from "@/server/notify/templates";
@@ -28,6 +30,12 @@ export async function submitInquiry(
 ): Promise<InquiryDoc> {
   const spam = await isBlocked(db, input.email);
   const inquiry = await insertInquiry(db, input, { source: options.source, status: spam ? "spam" : "new" });
+  try {
+    // A message from a known client's address joins their timeline.
+    inquiry.clientId = await linkToKnownClient(db, inquiry);
+  } catch (error) {
+    log.error({ err: error, ref: inquiry.ref }, "linking a message to its client failed");
+  }
   if (!spam)
     await queueAlerts(db, inquiry, {
       siteUrl: options.siteUrl,

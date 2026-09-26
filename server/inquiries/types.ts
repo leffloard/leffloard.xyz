@@ -54,4 +54,5 @@ export type InquiryDoc = {
   // Deleted by a TTL index: 24 months after the last activity (see the privacy notice), 30 days for spam.
   purgeAt: Date | null;
   legacyId?: string;
+  clientId?: ObjectId | null; // the client it belongs to (missing on messages from before clients existed)
 };

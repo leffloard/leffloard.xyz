@@ -1,27 +1,60 @@
 // Dates in the admin are shown in the owner's time zone. (A setting later; Istanbul for now.)
 export const ADMIN_TIME_ZONE = "Europe/Istanbul";
 
-const dateTime = new Intl.DateTimeFormat("en-GB", {
+// Short month names are spelled out here: ICU versions disagree ("Sep" or "Sept"), and the server and the
+// browser may run different ones.
+export const SHORT_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const parts = new Intl.DateTimeFormat("en-GB", {
   timeZone: ADMIN_TIME_ZONE,
-  day: "numeric",
-  month: "short",
+  hourCycle: "h23",
   year: "numeric",
+  month: "numeric",
+  day: "numeric",
   hour: "2-digit",
   minute: "2-digit",
 });
 
-const timeOnly = new Intl.DateTimeFormat("en-GB", {
-  timeZone: ADMIN_TIME_ZONE,
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-export function formatDateTime(date: Date): string {
-  return dateTime.format(date);
+function wall(date: Date) {
+  const values = Object.fromEntries(
+    parts.formatToParts(date).map((part) => [part.type, part.value]),
+  ) as Record<Intl.DateTimeFormatPartTypes, string>;
+  return {
+    day: Number(values.day),
+    month: SHORT_MONTHS[Number(values.month) - 1]!,
+    year: values.year,
+    time: `${values.hour}:${values.minute}`,
+  };
 }
 
+// "26 Sep 2026, 14:30"
+export function formatDateTime(date: Date): string {
+  const { day, month, year, time } = wall(date);
+  return `${day} ${month} ${year}, ${time}`;
+}
+
+// "26 Sep 2026"
+export function formatDate(date: Date): string {
+  const { day, month, year } = wall(date);
+  return `${day} ${month} ${year}`;
+}
+
+// "14:30"
 export function formatTime(date: Date): string {
-  return timeOnly.format(date);
+  return wall(date).time;
 }
 
 export function formatRelative(date: Date, now: Date = new Date()): string {

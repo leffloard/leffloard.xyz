@@ -21,7 +21,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /admin-(inbox|settings)\.spec\.ts/,
+      testIgnore: /admin-(inbox|settings|work)\.spec\.ts/,
       use: chromium,
     },
     {
@@ -30,6 +30,13 @@ export default defineConfig({
       name: "admin-modules",
       testMatch: /admin-(inbox|settings)\.spec\.ts/,
       dependencies: ["chromium"],
+      use: chromium,
+    },
+    {
+      // Clients, projects, tasks and time: after the inbox tests, which count every inbox message.
+      name: "admin-work",
+      testMatch: /admin-work\.spec\.ts/,
+      dependencies: ["admin-modules"],
       use: chromium,
     },
   ],

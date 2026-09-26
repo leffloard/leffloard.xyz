@@ -1,7 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 import { E2E_BASE_URL } from "./fixtures";
-import { clearIntakeLimits, signInOwner, withDb } from "./helpers";
+import { axeViolations, clearIntakeLimits, signInOwner, withDb } from "./helpers";
 import { expect, test } from "./test";
 
 // The inbox, from a message arriving to replying, organising and deleting it. Runs after the other
@@ -22,15 +21,6 @@ async function sendMessage(request: APIRequestContext, overrides: Record<string,
     },
   });
   expect(response.status()).toBe(201);
-}
-
-async function axeViolations(page: Page): Promise<string[]> {
-  const result = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  return result.violations.map(
-    (violation) => `${violation.id}: ${violation.nodes.map((node) => node.target).join(" ")}`,
-  );
 }
 
 test.beforeAll(async ({ request }) => {

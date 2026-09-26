@@ -2,14 +2,21 @@ import type { ReactNode } from "react";
 import { Logo } from "@/components/admin/auth-frame";
 import { AdminNav } from "@/components/admin/nav";
 import { SignOutButton } from "@/components/admin/sign-out-button";
+import { TimerWidget, type RunningTimerView } from "@/components/admin/time/timer-widget";
+
+export type ShellTimer = { running: RunningTimerView | null; projects: { id: string; label: string }[] };
 
 export function AdminShell({
   user,
   newInquiries = 0,
+  tasksDue = 0,
+  timer,
   children,
 }: {
   user: { name: string; email: string };
   newInquiries?: number;
+  tasksDue?: number;
+  timer?: ShellTimer;
   children: ReactNode;
 }) {
   return (
@@ -21,8 +28,13 @@ export function AdminShell({
           <span className="ml-auto font-mono text-[10px] tracking-[0.08em] text-muted uppercase">admin</span>
         </div>
         <div className="flex-1 overflow-y-auto px-2 py-3">
-          <AdminNav newInquiries={newInquiries} />
+          <AdminNav newInquiries={newInquiries} tasksDue={tasksDue} />
         </div>
+        {timer ? (
+          <div className="border-t border-line p-3">
+            <TimerWidget running={timer.running} projects={timer.projects} />
+          </div>
+        ) : null}
         <div className="border-t border-line p-3">
           <p className="truncate text-[13px] font-medium">{user.name}</p>
           <p className="truncate text-xs text-muted">{user.email}</p>
@@ -34,12 +46,26 @@ export function AdminShell({
         <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur lg:hidden">
           <Logo className="size-6" />
           <span className="text-sm font-semibold">leffloard</span>
-          <details className="relative ml-auto">
+          {timer?.running ? (
+            <span className="ml-auto flex items-center gap-1.5 text-xs text-accent">
+              <span
+                aria-hidden
+                className="size-2 animate-pulse rounded-full bg-accent motion-reduce:animate-none"
+              />
+              Timer on
+            </span>
+          ) : null}
+          <details className={timer?.running ? "relative" : "relative ml-auto"}>
             <summary className="flex h-8 cursor-pointer list-none items-center rounded-md border border-line-strong px-3 text-[13px] [&::-webkit-details-marker]:hidden">
               Menu
             </summary>
-            <div className="absolute right-0 mt-2 w-60 rounded-lg border border-line bg-surface p-2 shadow-2xl shadow-black/50">
-              <AdminNav newInquiries={newInquiries} />
+            <div className="absolute right-0 mt-2 w-64 rounded-lg border border-line bg-surface p-2 shadow-2xl shadow-black/50">
+              <AdminNav newInquiries={newInquiries} tasksDue={tasksDue} />
+              {timer ? (
+                <div className="mt-2 border-t border-line pt-2">
+                  <TimerWidget running={timer.running} projects={timer.projects} compact />
+                </div>
+              ) : null}
               <SignOutButton className="mt-2 w-full" />
             </div>
           </details>

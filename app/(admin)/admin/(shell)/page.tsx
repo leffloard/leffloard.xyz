@@ -16,15 +16,23 @@ import { channelStatus } from "@/server/notify/channels";
 import { outboxSummary } from "@/server/notify/outbox";
 import { pendingMigrations } from "@/server/db/migrate";
 import { readEnv } from "@/server/env";
+import { DueText } from "@/components/admin/work/due-text";
+import { TaskList } from "@/components/admin/work/task-list";
+import { todayIn } from "@/lib/intake/time";
+import { dueLabel } from "@/lib/work/dates";
+import { PROJECT_STAGE_LABELS } from "@/lib/work/options";
+import { listProjects } from "@/server/projects/store";
+import { listTasks } from "@/server/tasks/store";
+import { toTaskRow } from "@/server/tasks/view";
 
 export const metadata = { title: "Today" };
 
 const ROADMAP = [
-  ["M5", "Clients, projects, tasks, revisions and time tracking"],
   ["M6", "Calendar and booking"],
   ["M7", "Quotes, invoices, crypto and bank payments, finance"],
   ["M8", "Client portal"],
   ["M9", "Content editor for the public site, and GitHub sync"],
+  ["M10", "AI assistant"],
 ] as const;
 
 function greeting(at: Date): string {
@@ -41,15 +49,19 @@ export default async function TodayPage() {
   const { user } = await requireAdmin();
   const db = await getDb();
   const at = now();
-  const [sessions, passkeys, pending, lastSignIns, newCount, latest, delivery] = await Promise.all([
-    listSessions(db, user._id),
-    listPasskeys(db, user._id),
-    pendingMigrations(db),
-    recentAudit(db, { prefix: "auth.login", limit: 20 }),
-    countNew(db),
-    latestInquiries(db, 5, at),
-    outboxSummary(db),
-  ]);
+  const today = todayIn(ADMIN_TIME_ZONE, at);
+  const [sessions, passkeys, pending, lastSignIns, newCount, latest, delivery, dueTasks, openProjects] =
+    await Promise.all([
+      listSessions(db, user._id),
+      listPasskeys(db, user._id),
+      pendingMigrations(db),
+      recentAudit(db, { prefix: "auth.login", limit: 20 }),
+      countNew(db),
+      latestInquiries(db, 5, at),
+      outboxSummary(db),
+      listTasks(db, "today", today, { limit: 12 }),
+      listProjects(db, { view: "open" }),
+    ]);
   const channels = channelStatus();
   const profile = toPublicUser(user);
   const warnings = readEnv().warnings;
@@ -109,6 +121,69 @@ export default async function TodayPage() {
               </ul>
             )}
           </CardBody>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader
+            title="Due today"
+            description={
+              dueTasks.length
+                ? `${plural(dueTasks.length, "task")} due today or late.`
+                : "Nothing due. Pick something from Anytime, or plan the week."
+            }
+            action={
+              <Link
+                href="/admin/tasks"
+                className="text-[13px] text-accent underline-offset-4 hover:underline"
+              >
+                Tasks
+              </Link>
+            }
+          />
+          {dueTasks.length ? (
+            <CardBody>
+              <TaskList rows={dueTasks.map((task) => toTaskRow(task, today))} emptyText="" keyboard={false} />
+            </CardBody>
+          ) : null}
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader
+            title="Projects"
+            description={
+              openProjects.items.length
+                ? `${plural(openProjects.items.length, "open project")}, soonest first.`
+                : "No open projects. Start one from a client or an inbox message."
+            }
+            action={
+              <Link
+                href="/admin/projects"
+                className="text-[13px] text-accent underline-offset-4 hover:underline"
+              >
+                Board
+              </Link>
+            }
+          />
+          {openProjects.items.length ? (
+            <ul className="divide-y divide-line">
+              {openProjects.items.slice(0, 6).map((project) => (
+                <li key={project._id.toHexString()}>
+                  <Link
+                    href={`/admin/projects/${project._id.toHexString()}`}
+                    className="flex min-w-0 items-baseline gap-3 px-5 py-2 text-[13px] hover:text-accent"
+                  >
+                    <span className="shrink-0 font-mono text-[11px] text-muted">{project.ref}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{project.title}</span>
+                    <span className="hidden truncate text-xs text-muted sm:inline">{project.clientName}</span>
+                    <Badge className="hidden sm:inline-flex">{PROJECT_STAGE_LABELS[project.stage]}</Badge>
+                    {project.dueDate ? (
+                      <DueText due={dueLabel(project.dueDate, today)} className="shrink-0 text-xs" />
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </Card>
 
         <Card>

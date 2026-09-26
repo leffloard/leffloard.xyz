@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Db } from "mongodb";
 import { CallCard, type CallInfo } from "@/components/admin/inbox/call-card";
+import { ClientCard } from "@/components/admin/inbox/client-card";
 import { LinkifiedText } from "@/components/admin/inbox/linkified-text";
 import { OrganizeCard } from "@/components/admin/inbox/organize-card";
 import { ReplyComposer } from "@/components/admin/inbox/reply-composer";
@@ -18,12 +20,15 @@ import {
   TIMELINE_OPTIONS,
 } from "@/lib/intake/options";
 import { describeMoment, wallDateTime, zonedInstant } from "@/lib/intake/time";
+import { OPEN_STAGES } from "@/lib/work/options";
 import { requireAdmin } from "@/server/auth/dal";
+import { clientChoices, findClientsByEmail, getClient } from "@/server/clients/store";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
 import { getInquiry, listLabels, parseInquiryId } from "@/server/inquiries/store";
 import type { Delivery, InquiryDoc } from "@/server/inquiries/types";
 import { channelStatus } from "@/server/notify/channels";
+import { projectsForClient } from "@/server/projects/store";
 import { defaultReplySubject } from "@/server/notify/templates";
 
 export const metadata = { title: "Message" };
@@ -62,13 +67,40 @@ function callInfo(inquiry: InquiryDoc): CallInfo | null {
   };
 }
 
+// The client the message belongs to, or who it could belong to.
+async function clientCardData(db: Db, inquiry: InquiryDoc) {
+  const client = inquiry.clientId ? await getClient(db, inquiry.clientId) : null;
+  if (client) {
+    const projects = await projectsForClient(db, client._id);
+    return {
+      client: { id: client._id.toHexString(), name: client.name },
+      matches: [],
+      clients: [],
+      projects: projects
+        .filter((project) => OPEN_STAGES.includes(project.stage) || project.stage === "delivered")
+        .map((project) => ({ id: project._id.toHexString(), label: `${project.ref} · ${project.title}` })),
+    };
+  }
+  const [matches, choices] = await Promise.all([findClientsByEmail(db, inquiry.email), clientChoices(db)]);
+  const label = (name: string, company: string | null) => (company ? `${name} (${company})` : name);
+  return {
+    client: null,
+    matches: matches.map((match) => ({
+      id: match._id.toHexString(),
+      label: label(match.name, match.company),
+    })),
+    clients: choices.map((choice) => ({ id: choice.id, label: label(choice.name, choice.company) })),
+    projects: [],
+  };
+}
+
 export default async function InquiryPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
   const id = parseInquiryId((await params).id);
   const db = await getDb();
   const inquiry = id ? await getInquiry(db, id) : null;
   if (!inquiry) notFound();
-  const knownLabels = await listLabels(db);
+  const [knownLabels, clientCard] = await Promise.all([listLabels(db), clientCardData(db, inquiry)]);
   const canEmail = channelStatus().clientEmail;
   const at = now();
   const hexId = inquiry._id.toHexString();
@@ -196,6 +228,13 @@ export default async function InquiryPage({ params }: { params: Promise<{ id: st
 
         <div className="grid min-w-0 content-start gap-6">
           <StatusPanel id={hexId} status={inquiry.status} visitorName={inquiry.name} canEmail={canEmail} />
+          <ClientCard
+            inquiryId={hexId}
+            isRevision={inquiry.kind === "revision"}
+            isSpam={inquiry.status === "spam"}
+            revision={{ title: inquiry.subject, details: inquiry.message }}
+            {...clientCard}
+          />
           {call ? <CallCard id={hexId} call={call} canEmail={canEmail} visitorName={inquiry.name} /> : null}
           <OrganizeCard
             id={hexId}

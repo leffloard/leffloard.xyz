@@ -29,8 +29,9 @@ export default function PrivacyPage() {
           whatever you write about your project.
         </li>
         <li>
-          <strong>Client records</strong> once we work together: quotes, invoices, payments and project
-          communication.
+          <strong>Client records</strong> once we work together: your contact details, notes on our calls,
+          emails and meetings, the project&apos;s tasks, revision requests and the time spent on it, and
+          quotes, invoices and payments.
         </li>
         <li>
           <strong>Technical data</strong> needed to run the site securely: IP address, browser type and the

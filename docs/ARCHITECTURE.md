@@ -5,7 +5,8 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M4, going live: backups, background jobs and deploys**.
+This document grows with each milestone. Current state: **M5, the work itself: clients, projects, tasks,
+revision rounds and time tracking**.
 
 ## Layout
 
@@ -16,7 +17,7 @@ app/                      Routes (App Router)
   sitemap.ts, robots.ts   Machine-readable files (plus manifest.ts and .well-known/security.txt)
   (admin)/admin/          Admin, with its own root layout (dynamic, noindex)
     login/, setup/        Sign-in, two-step check, first-time authenticator setup
-    (shell)/              Signed-in pages: Today, Inbox, Security, Settings
+    (shell)/              Signed-in pages: Today, Inbox, Tasks, Projects, Clients, Time, Security, Settings
   api/inquiries/route.ts  The contact form's endpoint
   api/requests/route.ts   The v1 form API, same contract as v1 (kept until the legacy code is removed)
   api/[[...path]]/        JSON 404 for unknown API addresses
@@ -26,8 +27,10 @@ app/                      Routes (App Router)
   globals.css             Tailwind 4 entry and design tokens
 components/               UI: ui/ (buttons, fields, cards), site/ (public site) and admin/
 content/                  Public site content until the CMS (M9): site facts, work, services, CV, blog posts
-lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, CSP builder, formatting
+lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, CSP builder, formatting, money
+                          (integer minor units), ranks for ordered lists, durations, admin form schemas
   intake/                 The form rules shared by browser and server (ported from the v1 backend)
+  work/                   Choices and calendar-date rules of the work modules (stages, due dates, repeats)
 server/                   Server-only code (every file imports "server-only")
   env.ts                  Validated configuration, plain-English errors
   boot.ts                 Runs once at start-up (via instrumentation.ts); stops on bad config
@@ -40,10 +43,16 @@ server/                   Server-only code (every file imports "server-only")
   security/               Password hashing, encryption, rate limits, lockouts, Turnstile, Access, CSRF, NoSQL guard,
                           idempotency keys
   inquiries/              The inbox: storing, listing and changing messages, the blocklist, the v1 data copy
+  clients/                Clients, their log and timeline, linking inbox messages, export and delete
+  projects/               Projects, milestones, links, revision rounds
+  tasks/, time/           Tasks (lists, board, checklists, repeats) and time entries (the one running timer)
+  work/collections.ts     The work modules' collections, so their stores do not import each other
   notify/                 Notification channels, templates, escaping, the outbox, SMTP and Discord senders
   jobs/                   Background jobs inside the server process (croner), with once-per-period runs
   backup/                 Encrypted backups (gzip + AES-256-GCM), restore with a check first
   db/client.ts            One MongoClient per process
+  db/ordering.ts          Placing an item in a ranked list (boards)
+  db/transaction.ts       Runs work in a transaction
   db/migrate.ts           Migration runner with a database lock
   db/migrations/          The ordered migration list
   db/url.ts               Connection-string redaction for messages
@@ -258,6 +267,41 @@ RFC 2047 encoded words are defused. The webhook address is never stored, logged 
 copy, `--verify` to compare. The v1 collection is only read. Each copy keeps its v1 id, so a unique index
 makes a second run add only what is new, and going back to v1 stays possible.
 
+## Clients, projects, tasks and time
+
+The admin's daily work (M5). Every change goes through `adminAction()`; stores in `server/clients`,
+`server/projects`, `server/tasks` and `server/time` are the only code that queries these collections.
+
+- **Clients** have a status (lead, active, past, archived), details, tags and private notes, and a log of
+  calls, emails and meetings that happened outside the app. A client's page merges the log, their inbox
+  messages and the emails sent to them, projects and revision rounds into one timeline. An inbox message
+  becomes a client in one click (linking every other message from that address), and a new message from a
+  known client's address is linked as it arrives. **Export** (a JSON file of everything about the client) and
+  **delete** (the client with their projects, rounds, tasks, time and log, in one transaction) ask to confirm
+  it's you and are written to the audit log; their inbox messages stay, unlinked, under the inbox's retention.
+- **Projects** move through planned, in progress, in review and delivered on a board (paused and cancelled
+  ones are in the list view). Each has a price (fixed, or hourly with an optional cap), an estimate,
+  milestones, links, and a health view: time against the estimate, and the effective hourly rate of a fixed
+  price or the value of billable hours. Edit forms carry a `version`, so saving over a newer change fails
+  instead of undoing it.
+- **Revision rounds** count against the project's included rounds ("2 of 3 used"). The counter and the round
+  are written in one transaction, so two requests at once cannot both be round 2; a round past the included
+  ones is marked billable with the extra-round price of that moment. Cancelling a round gives it back. A
+  revision request in the inbox becomes a round, with a task on the project's board, in one click.
+- **Tasks** live in lists (Today with anything late, Overdue, Upcoming by day, Anytime, Someday, Done) and on
+  each project's board (to do, doing, done). Due dates are calendar dates in the owner's time zone. Finishing
+  a repeating task moves it to its next date (after today, so a late one does not come back overdue).
+- **Time**: one timer runs at a time, from the sidebar or any task or project. A unique partial index on the
+  running entry makes that a database rule, not a UI habit: a second start at the same moment is refused by
+  the index, stops the winner and tries again. Timers stopped within a minute are dropped. The timesheet shows
+  the owner's week (Monday to Sunday, Istanbul time) with entries added by hand.
+- **Boards** (`components/admin/work/board.tsx`) work with the keyboard (arrows move the focus, Shift and an
+  arrow moves the card, Enter opens it) and a pointer. A move shows at once, is announced to screen readers,
+  and is undone if the server refuses it. Each card stores a fractional rank (`lib/rank.ts`), so a move
+  rewrites one document.
+- **Money** is an integer amount of minor units with its currency (`lib/money.ts`); formatting, parsing and
+  rounding happen only there.
+
 ## Operations
 
 The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
@@ -294,7 +338,10 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
 - End-to-end tests start `scripts/e2e-server.ts`: a throwaway database with migrations applied and the
   standalone build started exactly as production starts it. Any console error or failed request on a page
   fails the test.
-- Every public page is checked with axe (WCAG 2.2 AA) in both themes, and for horizontal overflow at 360px.
+- Every public page is checked with axe (WCAG 2.2 AA) in both themes, and for horizontal overflow at 360px;
+  the admin's pages are checked with axe as the tests go through them.
+- Admin tests that share data run in order: the sign-in tests, then the inbox and settings, then the work
+  modules (Playwright project dependencies in `playwright.config.ts`).
 - Offline machines can use local binaries: `MONGOMS_SYSTEM_BINARY=/path/to/mongod`,
   `PW_CHROMIUM_PATH=/path/to/chrome`.
 
@@ -375,3 +422,11 @@ Every direct dependency and why it is here.
     that protects the secrets inside the database, and either key can be replaced on its own.
 15. **A trial start before every switch.** The deploy proves the new release answers its deep health check
     on the real database before visitors reach it; the old release keeps serving until then.
+16. **Fractional ranks for ordered lists** instead of numbered positions: moving a card writes only that
+    card, and a list renumbers itself only if two items were ranked at the same moment. The algorithm is
+    small and public domain, so it lives in `lib/rank.ts` with its published test vectors instead of a
+    dependency.
+17. **Invariants live in the database.** "One timer runs" is a unique partial index and "round numbers are
+    unique" a unique index with a transaction, so no race between two tabs can break them.
+18. **Money as integer minor units with the currency** on every amount, and one module for its arithmetic,
+    so no float ever reaches an invoice (M7) and amounts in different currencies are never added.

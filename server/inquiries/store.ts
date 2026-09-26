@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ObjectId, type Db, type Document, type Filter } from "mongodb";
 import type { InquiryInput } from "@/lib/intake/form";
 import { INQUIRY_STATUSES, type InquiryKind, type InquiryStatus } from "@/lib/intake/options";
+import { escapeRegex } from "@/lib/search";
 import { now } from "@/server/clock";
 import type { InquiryDoc, InquirySource, ReplyEntry, StatusChange } from "@/server/inquiries/types";
 
@@ -134,9 +135,7 @@ export type InboxItem = Pick<
 
 export type InboxCounts = Record<InboxView, number>;
 
-export function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+export { escapeRegex };
 
 const SEARCH_FIELDS = ["name", "email", "subject", "projectReference", "company", "ref"] as const;
 

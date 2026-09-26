@@ -92,7 +92,10 @@ export type AuditAction =
   | "inbox.inquiry.deleted"
   | "inbox.sender.blocked"
   | "inbox.sender.unblocked"
-  | "inbox.legacy.migrated";
+  | "inbox.legacy.migrated"
+  | "clients.client.exported"
+  | "clients.client.deleted"
+  | "projects.project.deleted";
 
 export type AuditDoc = {
   _id: ObjectId;

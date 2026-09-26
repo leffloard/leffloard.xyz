@@ -73,4 +73,49 @@ export const migrations: Migration[] = [
       await db.collection("idempotency_keys").createIndex({ expiresAt: 1 }, expires);
     },
   },
+  {
+    id: "0005",
+    name: "clients-projects-tasks-time",
+    async up(db) {
+      const clients = db.collection("clients");
+      await clients.createIndex({ emailKey: 1 });
+      await clients.createIndex({ status: 1, updatedAt: -1 });
+      await clients.createIndex({ updatedAt: -1 });
+
+      const activities = db.collection("activities");
+      await activities.createIndex({ clientId: 1, at: -1 });
+      await activities.createIndex({ projectId: 1, at: -1 });
+
+      const projects = db.collection("projects");
+      await projects.createIndex({ ref: 1 }, { unique: true });
+      await projects.createIndex({ clientId: 1, createdAt: -1 });
+      await projects.createIndex({ stage: 1, rank: 1 });
+
+      const revisions = db.collection("revisions");
+      await revisions.createIndex({ projectId: 1, number: 1 }, { unique: true });
+      await revisions.createIndex({ clientId: 1, requestedAt: -1 });
+
+      const tasks = db.collection("tasks");
+      await tasks.createIndex({ projectId: 1, status: 1, rank: 1 });
+      await tasks.createIndex({ status: 1, due: 1 });
+      await tasks.createIndex({ status: 1, completedAt: -1 });
+      await tasks.createIndex({ clientId: 1 });
+
+      const time = db.collection("time_entries");
+      // Only one timer can run: the running entry is the only one with `running: true`.
+      await time.createIndex(
+        { running: 1 },
+        { unique: true, partialFilterExpression: { running: true }, name: "one_running_timer" },
+      );
+      await time.createIndex({ startedAt: -1 });
+      await time.createIndex({ projectId: 1, startedAt: -1 });
+      await time.createIndex({ clientId: 1 });
+      await time.createIndex({ taskId: 1 });
+
+      // Messages linked to a client.
+      await db
+        .collection("inquiries")
+        .createIndex({ clientId: 1 }, { partialFilterExpression: { clientId: { $type: "objectId" } } });
+    },
+  },
 ];

@@ -26,6 +26,9 @@ const LABELS: Record<string, string> = {
   "inbox.sender.blocked": "Sender blocked",
   "inbox.sender.unblocked": "Sender unblocked",
   "inbox.legacy.migrated": "v1 requests copied into the inbox",
+  "clients.client.exported": "Client data exported",
+  "clients.client.deleted": "Client deleted",
+  "projects.project.deleted": "Project deleted",
 };
 
 const WARNINGS = new Set([

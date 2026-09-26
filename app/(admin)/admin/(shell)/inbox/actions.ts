@@ -12,6 +12,7 @@ import { ADMIN_TIME_ZONE } from "@/lib/format";
 import { snoozeUntil } from "@/lib/snooze";
 import { adminAction, type ActionContext } from "@/server/auth/action";
 import { audit } from "@/server/auth/audit";
+import { touchClient } from "@/server/clients/store";
 import { now } from "@/server/clock";
 import { getEnv } from "@/server/env";
 import { block } from "@/server/inquiries/blocklist";
@@ -63,6 +64,8 @@ async function queueVisitorEmail(
     error: null,
   };
   await addReply(db, inquiry._id, reply);
+  // An email to a client counts as contact with them.
+  if (inquiry.clientId) await touchClient(db, inquiry.clientId, reply.createdAt, reply.createdAt);
   await enqueue(db, {
     channel: "email",
     payload: message,

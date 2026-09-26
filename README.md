@@ -72,6 +72,20 @@ blocked senders.
 `npm run migrate-legacy -- --apply` copies it, and `npm run migrate-legacy -- --verify` checks the copy. The
 v1 data is only read, never changed.
 
+### Clients, projects, tasks and time
+
+- **Clients**: open an inbox message and press **Make the sender a client**; later messages from that address
+  join the client's timeline by themselves. Log calls and meetings on the client's page. **Export data** and
+  **Delete client** are for privacy requests (both ask to confirm it's you).
+- **Projects**: **Start a project** from the message or the client. The board (`/admin/projects`) moves
+  projects between stages with the mouse or the keyboard (focus a card, then `Shift` + arrows). Each project
+  has tasks (its own board), revision rounds ("2 of 3 included rounds used"; extra rounds are marked billable),
+  time and a health view.
+- **Tasks** (`/admin/tasks`): Today, Overdue, Upcoming, Anytime and Someday lists. Keys: `n` new task, `j`/`k`
+  move, `x` done. Repeating tasks move to their next date when you finish them.
+- **Time**: the timer is in the sidebar (one runs at a time); the **Time** page is the week's timesheet, where
+  you can also add time by hand.
+
 ### Useful commands
 
 | Command | What it does |
