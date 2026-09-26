@@ -2,10 +2,21 @@
 // production build started from the standalone output exactly as the VDS will run it.
 // Needs "npm run build" first.
 import { spawn } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { MongoClient } from "mongodb";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
+import { createOwner } from "@/server/auth/users";
 import { runMigrations } from "@/server/db/migrate";
-import { E2E_BASE_URL, E2E_DB_NAME, E2E_HEALTH_TOKEN, E2E_PORT } from "@/tests/e2e/fixtures";
+import {
+  E2E_BASE_URL,
+  E2E_DB_NAME,
+  E2E_ENCRYPTION_KEYS,
+  E2E_HEALTH_TOKEN,
+  E2E_MONGO_URL_FILE,
+  E2E_PORT,
+  OWNER,
+} from "@/tests/e2e/fixtures";
 import { assembleStandalone, STANDALONE_SERVER } from "./lib/standalone";
 
 async function main(): Promise<void> {
@@ -26,7 +37,11 @@ async function main(): Promise<void> {
   const mongoUrl = replSet.getUri();
   const client = await new MongoClient(mongoUrl).connect();
   await runMigrations(client.db(E2E_DB_NAME));
+  // The owner account, as "npm run admin -- create" makes it: two-step sign-in is set up by the tests.
+  await createOwner(client.db(E2E_DB_NAME), OWNER);
   await client.close();
+  mkdirSync(path.dirname(E2E_MONGO_URL_FILE), { recursive: true });
+  writeFileSync(E2E_MONGO_URL_FILE, mongoUrl);
 
   const server = spawn(process.execPath, [STANDALONE_SERVER], {
     stdio: "inherit",
@@ -39,6 +54,8 @@ async function main(): Promise<void> {
       DB_NAME: E2E_DB_NAME,
       SITE_URL: E2E_BASE_URL,
       HEALTH_TOKEN: E2E_HEALTH_TOKEN,
+      DATA_ENCRYPTION_KEYS: E2E_ENCRYPTION_KEYS,
+      CLIENT_IP_SOURCE: "socket",
       LOG_LEVEL: process.env.LOG_LEVEL ?? "warn",
     },
   });

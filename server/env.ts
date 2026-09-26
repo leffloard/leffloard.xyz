@@ -49,6 +49,48 @@ const siteUrl = z
 
 const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "silent"] as const;
 
+const KEYGEN_HINT =
+  "Generate one with: node -e \"console.log('1:' + require('crypto').randomBytes(32).toString('base64'))\"";
+
+export type KeyRing = { current: number; keys: ReadonlyMap<number, Buffer> };
+
+// "2:<base64>,1:<base64>": numbered 32-byte keys. New data is encrypted with the highest number; older keys
+// stay listed until everything encrypted with them has been re-encrypted. Messages never show a key.
+const encryptionKeys = z
+  .string({ error: `DATA_ENCRYPTION_KEYS is missing. ${KEYGEN_HINT}` })
+  .trim()
+  .transform((value, ctx): KeyRing => {
+    const keys = new Map<number, Buffer>();
+    const fail = (message: string) => {
+      ctx.addIssue({ code: "custom", message });
+      return z.NEVER;
+    };
+    for (const entry of value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)) {
+      const match = /^(\d{1,4}):([A-Za-z0-9+/_-]+={0,2})$/.exec(entry);
+      const key = match?.[2] ? Buffer.from(match[2], "base64") : undefined;
+      if (!match || key?.length !== 32) {
+        return fail(
+          `DATA_ENCRYPTION_KEYS entries must look like 1:<32 random bytes as base64>. ${KEYGEN_HINT}`,
+        );
+      }
+      const version = Number(match[1]);
+      if (keys.has(version)) return fail(`DATA_ENCRYPTION_KEYS lists key number ${version} twice.`);
+      keys.set(version, key);
+    }
+    if (keys.size === 0) return fail(`DATA_ENCRYPTION_KEYS is empty. ${KEYGEN_HINT}`);
+    return { current: Math.max(...keys.keys()), keys };
+  });
+
+const optionalText = () =>
+  z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined);
+
 const schema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"], {
@@ -75,7 +117,66 @@ const schema = z.object({
   LOG_LEVEL: z
     .enum(LOG_LEVELS, { error: `LOG_LEVEL must be one of: ${LOG_LEVELS.join(", ")}.` })
     .default("info"),
+  DATA_ENCRYPTION_KEYS: encryptionKeys,
+  CLIENT_IP_SOURCE: z
+    .enum(["socket", "cloudflare"], { error: "CLIENT_IP_SOURCE must be socket or cloudflare." })
+    .default("socket"),
+  TURNSTILE_SITE_KEY: optionalText(),
+  TURNSTILE_SECRET_KEY: optionalText(),
+  CF_ACCESS_TEAM_DOMAIN: optionalText()
+    .transform((value) =>
+      value
+        ?.replace(/^https?:\/\//, "")
+        .replace(/\/+$/, "")
+        .toLowerCase(),
+    )
+    .pipe(
+      z
+        .string()
+        .regex(
+          /^[a-z0-9-]+\.cloudflareaccess\.com$/,
+          "CF_ACCESS_TEAM_DOMAIN must look like your-team.cloudflareaccess.com.",
+        )
+        .optional(),
+    ),
+  CF_ACCESS_AUD: optionalText().pipe(
+    z
+      .string()
+      .regex(/^[a-f0-9]{64}$/, "CF_ACCESS_AUD must be the 64-character Application Audience (AUD) tag.")
+      .optional(),
+  ),
 });
+
+const checkedSchema = schema.superRefine((env, ctx) => {
+  if (Boolean(env.TURNSTILE_SITE_KEY) !== Boolean(env.TURNSTILE_SECRET_KEY)) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY, or neither.",
+    });
+  }
+  if (Boolean(env.CF_ACCESS_TEAM_DOMAIN) !== Boolean(env.CF_ACCESS_AUD)) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Set both CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD, or neither.",
+    });
+  }
+});
+
+// Allowed, but worth a line in the start-up log of a production server.
+function productionWarnings(env: z.infer<typeof schema>): string[] {
+  if (env.NODE_ENV !== "production") return [];
+  const warnings: string[] = [];
+  if (!env.SITE_URL.startsWith("https://"))
+    warnings.push("SITE_URL is not https: sign-in cookies need https.");
+  if (!env.TURNSTILE_SECRET_KEY)
+    warnings.push("TURNSTILE_* is not set: sign-in and forms have no bot check.");
+  if (!env.CF_ACCESS_TEAM_DOMAIN)
+    warnings.push("CF_ACCESS_* is not set: /admin is protected by the sign-in only.");
+  if (env.CLIENT_IP_SOURCE === "socket") {
+    warnings.push("CLIENT_IP_SOURCE is socket: behind the Cloudflare Tunnel set it to cloudflare.");
+  }
+  return warnings;
+}
 
 export type Env = z.infer<typeof schema>;
 
@@ -86,8 +187,9 @@ export function readEnv(source: Record<string, string | undefined> = process.env
   const warnings = LEGACY_VARIABLES.filter((name) => source[name]).map(
     (name) => `${name} is only used by the old v1 backend and is ignored by this app.`,
   );
-  const result = schema.safeParse(source);
-  if (result.success) return { ok: true, env: result.data, warnings };
+  const result = checkedSchema.safeParse(source);
+  if (result.success)
+    return { ok: true, env: result.data, warnings: [...warnings, ...productionWarnings(result.data)] };
   const problems = result.error.issues.map((issue) => issue.message);
   return { ok: false, problems, warnings };
 }
@@ -104,6 +206,11 @@ export function formatProblems(problems: string[]): string {
 }
 
 let cached: Env | undefined;
+
+// For tests that change the environment between cases.
+export function clearEnvCache(): void {
+  cached = undefined;
+}
 
 export function getEnv(): Env {
   if (cached) return cached;

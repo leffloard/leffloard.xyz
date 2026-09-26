@@ -11,6 +11,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Security events are logged as warnings; tests check them in the database instead.
+    env: { LOG_LEVEL: "silent" },
     projects: [
       {
         extends: true,

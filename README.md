@@ -21,6 +21,18 @@ downloaded on the first start (about 100 MB).
 Development never touches the production Atlas database. The local data lives in `.data/dev-db`; delete that
 folder to start empty.
 
+### The admin (`/admin`)
+
+1. Create the owner account once, in a terminal on the machine that runs the site:
+   `npm run admin -- create` (asks for email, name and a password of at least 12 characters).
+2. Open `/admin/login` and sign in. The first sign-in sets up two-step sign-in: scan the QR code with an
+   authenticator app (Google Authenticator, 1Password, Aegis…), enter its code, and save the 10 recovery codes
+   it shows. They are not shown again.
+3. On the Security page, add a passkey (Windows Hello, Touch ID or your phone) as a second way in.
+
+Lost access? `npm run admin -- status` shows the account's setup; `reset-password`, `reset-2fa` and `unlock`
+are the recovery paths (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recovery)).
+
 ### Useful commands
 
 | Command | What it does |
@@ -28,6 +40,7 @@ folder to start empty.
 | `npm run dev:db` | Local MongoDB (replica set) on port 27027, applies migrations |
 | `npm run dev` | Development server with hot reload |
 | `npm run migrate` | Applies pending migrations to the database in `MONGO_URL` (`npm run migrate -- --status` only lists them) |
+| `npm run admin -- <command>` | Owner account tools: `create`, `status`, `reset-password`, `reset-2fa`, `unlock` |
 | `npm run build`, then `npm start` | Production build, started the way the server runs it |
 | `npm run lint`, `npm run typecheck`, `npm run format` | Code checks and formatting |
 | `npm run test:unit`, `npm run test:integration` | Tests (the integration tests start their own MongoDB) |

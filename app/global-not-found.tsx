@@ -13,9 +13,9 @@ export default function GlobalNotFound() {
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>
         <main className="mx-auto flex min-h-dvh max-w-3xl flex-col justify-center gap-6 px-6">
-          <p className="text-muted font-mono text-xs tracking-[0.08em] uppercase">Error 404</p>
+          <p className="font-mono text-xs tracking-[0.08em] text-muted uppercase">Error 404</p>
           <h1 className="text-5xl font-semibold tracking-tight">This page does not exist.</h1>
-          <p className="text-muted text-lg">
+          <p className="text-lg text-muted">
             <Link className="text-accent underline-offset-4 hover:underline" href="/">
               Go to the home page
             </Link>

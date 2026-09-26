@@ -13,6 +13,12 @@
   --color-muted: oklch(0.72 0.01 260);
   --color-line: oklch(1 0 0 / 0.08);
   --color-accent: oklch(0.86 0.13 205);
+  --color-accent-ink: oklch(0.2 0.03 220);
+  --color-surface-2: oklch(0.215 0.006 260);
+  --color-line-strong: oklch(1 0 0 / 0.14);
+  --color-danger: oklch(0.7 0.19 25);
+  --color-warning: oklch(0.82 0.15 80);
+  --color-success: oklch(0.78 0.15 155);
 }
 
 html {

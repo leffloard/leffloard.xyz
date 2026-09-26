@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { EnvError, formatProblems, readEnv } from "@/server/env";
+import { TEST_ENV_SOURCE, TEST_KEY_1, TEST_KEY_2 } from "../helpers/env";
 
-const VALID = { MONGO_URL: "mongodb+srv://user:pass@cluster0.example.mongodb.net/?appName=leff" };
+const VALID = TEST_ENV_SOURCE;
 
 function problemsFor(overrides: Record<string, string | undefined>): string[] {
   const report = readEnv({ ...VALID, ...overrides });
@@ -9,7 +10,7 @@ function problemsFor(overrides: Record<string, string | undefined>): string[] {
 }
 
 describe("readEnv", () => {
-  it("fills in defaults for everything but MONGO_URL", () => {
+  it("fills in defaults for everything but MONGO_URL and DATA_ENCRYPTION_KEYS", () => {
     const report = readEnv(VALID);
     expect(report).toEqual({
       ok: true,
@@ -21,12 +22,18 @@ describe("readEnv", () => {
         SITE_URL: "http://localhost:3000",
         HEALTH_TOKEN: undefined,
         LOG_LEVEL: "info",
+        DATA_ENCRYPTION_KEYS: { current: 1, keys: new Map([[1, Buffer.alloc(32, 1)]]) },
+        CLIENT_IP_SOURCE: "socket",
+        TURNSTILE_SITE_KEY: undefined,
+        TURNSTILE_SECRET_KEY: undefined,
+        CF_ACCESS_TEAM_DOMAIN: undefined,
+        CF_ACCESS_AUD: undefined,
       },
     });
   });
 
   it("accepts a local replica set address and trims spaces", () => {
-    const report = readEnv({ MONGO_URL: "  mongodb://127.0.0.1:27027/?replicaSet=rs0  " });
+    const report = readEnv({ ...VALID, MONGO_URL: "  mongodb://127.0.0.1:27027/?replicaSet=rs0  " });
     expect(report.ok && report.env.MONGO_URL).toBe("mongodb://127.0.0.1:27027/?replicaSet=rs0");
   });
 
@@ -84,6 +91,54 @@ describe("readEnv", () => {
       "MONGO_URL is missing. Put your MongoDB connection string in .env.local.",
       "DB_NAME may only use letters, digits, '_' and '-' (max 63).",
       "LOG_LEVEL must be one of: fatal, error, warn, info, debug, trace, silent.",
+    ]);
+  });
+
+  it("reads numbered encryption keys and uses the highest number for new data", () => {
+    const report = readEnv({ ...VALID, DATA_ENCRYPTION_KEYS: ` 1:${TEST_KEY_1} , 2:${TEST_KEY_2} ` });
+    expect(report.ok && report.env.DATA_ENCRYPTION_KEYS.current).toBe(2);
+    expect(report.ok && [...report.env.DATA_ENCRYPTION_KEYS.keys.keys()]).toEqual([1, 2]);
+  });
+
+  it.each([
+    [undefined, "DATA_ENCRYPTION_KEYS is missing."],
+    ["", "DATA_ENCRYPTION_KEYS is empty."],
+    [TEST_KEY_1, "DATA_ENCRYPTION_KEYS entries must look like 1:<32 random bytes as base64>."],
+    [`1:${Buffer.alloc(16, 7).toString("base64")}`, "DATA_ENCRYPTION_KEYS entries must look like"],
+    [`1:${TEST_KEY_1},1:${TEST_KEY_2}`, "DATA_ENCRYPTION_KEYS lists key number 1 twice."],
+  ])("explains a bad DATA_ENCRYPTION_KEYS (%j) without showing the key", (value, message) => {
+    const [problem] = problemsFor({ DATA_ENCRYPTION_KEYS: value });
+    expect(problem).toContain(message);
+    expect(problem).not.toContain(TEST_KEY_1);
+    expect(problem).not.toContain(TEST_KEY_2);
+  });
+
+  it("wants Turnstile and Cloudflare Access settings in pairs", () => {
+    expect(problemsFor({ TURNSTILE_SITE_KEY: "0x4AAAAAAA" })).toEqual([
+      "Set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY, or neither.",
+    ]);
+    expect(problemsFor({ CF_ACCESS_AUD: "a".repeat(64) })).toEqual([
+      "Set both CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD, or neither.",
+    ]);
+    const report = readEnv({
+      ...VALID,
+      CF_ACCESS_TEAM_DOMAIN: "https://Leff.cloudflareaccess.com/",
+      CF_ACCESS_AUD: "a".repeat(64),
+    });
+    expect(report.ok && report.env.CF_ACCESS_TEAM_DOMAIN).toBe("leff.cloudflareaccess.com");
+    expect(problemsFor({ CF_ACCESS_TEAM_DOMAIN: "leff.example.com", CF_ACCESS_AUD: "a".repeat(64) })).toEqual(
+      ["CF_ACCESS_TEAM_DOMAIN must look like your-team.cloudflareaccess.com."],
+    );
+  });
+
+  it("lists what a production server is missing, without failing", () => {
+    const report = readEnv({ ...VALID, NODE_ENV: "production", SITE_URL: "http://leffloard.xyz" });
+    expect(report.ok).toBe(true);
+    expect(report.warnings).toEqual([
+      "SITE_URL is not https: sign-in cookies need https.",
+      "TURNSTILE_* is not set: sign-in and forms have no bot check.",
+      "CF_ACCESS_* is not set: /admin is protected by the sign-in only.",
+      "CLIENT_IP_SOURCE is socket: behind the Cloudflare Tunnel set it to cloudflare.",
     ]);
   });
 

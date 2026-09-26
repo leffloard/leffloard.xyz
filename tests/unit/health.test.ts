@@ -1,19 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { EnvReport } from "@/server/env";
+import { readEnv, type EnvReport } from "@/server/env";
 import { deepHealth, tokenMatches, type HealthDeps } from "@/server/health";
+import { TEST_ENV_SOURCE } from "../helpers/env";
 
-const OK_ENV: EnvReport = {
-  ok: true,
-  warnings: [],
-  env: {
-    NODE_ENV: "test",
-    MONGO_URL: "mongodb://127.0.0.1:27017",
-    DB_NAME: "leffloard",
-    SITE_URL: "http://localhost:3000",
-    HEALTH_TOKEN: undefined,
-    LOG_LEVEL: "info",
-  },
-};
+const OK_ENV: EnvReport = readEnv(TEST_ENV_SOURCE);
 
 function deps(overrides: Partial<HealthDeps> = {}): HealthDeps {
   return {

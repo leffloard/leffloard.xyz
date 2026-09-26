@@ -22,6 +22,7 @@ design and every dependency.
 | Local database (keep it running) | `npm run dev:db`                                                                     |
 | Development server               | `npm run dev`                                                                        |
 | Apply migrations to `MONGO_URL`  | `npm run migrate` (`-- --status` to only list them)                                  |
+| Owner account tools              | `npm run admin -- create`, `status`, `reset-password`, `reset-2fa`, `unlock`         |
 | Checks                           | `npm run format:check`, `npm run lint`, `npm run typecheck`                          |
 | Tests                            | `npm run test:unit`, `npm run test:integration`, `npm run build && npm run test:e2e` |
 
@@ -31,9 +32,12 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
 ## Rules
 
 - All user-facing text (site, client portal, admin) is English.
-- Server code lives in `server/` and starts with `import "server-only"`. Configuration is read only through
+- Pure helpers (no I/O, safe anywhere) live in `lib/`. Server code lives in `server/` and starts with
+  `import "server-only"`. Configuration is read only through
   `getEnv()` in `server/env.ts`; time through `now()` in `server/clock.ts`; logging through `server/log.ts`.
-- Authorization never lives in `proxy.ts`. Every page, route handler and action checks access itself.
+- Authorization never lives in `proxy.ts`. Every admin page calls `requireAdmin()` (layouts alone are not
+  enough: they do not re-render on navigation), and every admin server action is built with `adminAction()`
+  from `server/auth/action.ts`, which checks the session, "confirm it's you" (`{ sudo: true }`) and input.
 - Database access goes through the official `mongodb` driver with explicit projections. Validate input with
   strict zod schemas; never build queries from unvalidated objects.
 - Migrations in `server/db/migrations` are forward-only, additive and safe to run twice. Never edit or reorder

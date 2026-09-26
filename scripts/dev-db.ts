@@ -2,7 +2,8 @@
 // .data/dev-db between runs. Development never touches the production Atlas database.
 //
 //   npm run dev:db      then, in a second terminal:   npm run dev
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { MongoClient } from "mongodb";
@@ -14,6 +15,11 @@ const DATA_DIR = path.resolve(".data", "dev-db");
 const ENV_FILE = path.resolve(".env.local");
 const MONGO_URL = `mongodb://127.0.0.1:${PORT}/?replicaSet=rs0`;
 
+// A development-only key. Production has its own, kept outside the repository.
+function newEncryptionKey(): string {
+  return `1:${randomBytes(32).toString("base64")}`;
+}
+
 function ensureEnvFile(): void {
   if (!existsSync(ENV_FILE)) {
     writeFileSync(
@@ -23,13 +29,22 @@ function ensureEnvFile(): void {
         `MONGO_URL=${MONGO_URL}`,
         "DB_NAME=leffloard",
         "SITE_URL=http://localhost:3000",
+        `DATA_ENCRYPTION_KEYS=${newEncryptionKey()}`,
         "",
       ].join("\n"),
     );
     console.log("Created .env.local with the local database address.");
     return;
   }
-  const current = /^MONGO_URL=(.*)$/m.exec(readFileSync(ENV_FILE, "utf8"))?.[1]?.trim();
+  const content = readFileSync(ENV_FILE, "utf8");
+  if (!/^DATA_ENCRYPTION_KEYS=\S/m.test(content)) {
+    appendFileSync(
+      ENV_FILE,
+      `${content.endsWith("\n") ? "" : "\n"}DATA_ENCRYPTION_KEYS=${newEncryptionKey()}\n`,
+    );
+    console.log("Added a development DATA_ENCRYPTION_KEYS to .env.local.");
+  }
+  const current = /^MONGO_URL=(.*)$/m.exec(content)?.[1]?.trim();
   if (current !== MONGO_URL) {
     console.log(
       `Note: .env.local points MONGO_URL somewhere else. For the local database use:\n  MONGO_URL=${MONGO_URL}`,
@@ -67,7 +82,8 @@ async function main(): Promise<void> {
 
   ensureEnvFile();
   console.log(`\nLocal MongoDB is running at ${MONGO_URL} (database "${dbName}").`);
-  console.log('Start the site with "npm run dev" in another terminal. Stop this one with Ctrl+C.\n');
+  console.log('Start the site with "npm run dev" in another terminal. Stop this one with Ctrl+C.');
+  console.log('No admin account yet? Run "npm run admin -- create" in another terminal.\n');
 
   let stopping = false;
   const stop = async (): Promise<void> => {

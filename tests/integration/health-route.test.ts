@@ -2,12 +2,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/health/route";
 import { closeClient, getDb } from "@/server/db/client";
 import { runMigrations } from "@/server/db/migrate";
+import { TEST_ENCRYPTION_KEYS } from "../helpers/env";
 import { setupTestDb } from "./db";
 
 const TOKEN = "health-token-for-integration-tests";
 const { url, name } = setupTestDb();
 
 beforeAll(() => {
+  vi.stubEnv("DATA_ENCRYPTION_KEYS", TEST_ENCRYPTION_KEYS);
   vi.stubEnv("MONGO_URL", url);
   vi.stubEnv("DB_NAME", name);
   vi.stubEnv("HEALTH_TOKEN", TOKEN);
