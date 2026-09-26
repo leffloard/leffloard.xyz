@@ -331,6 +331,7 @@ describe("timeline, export and delete", () => {
       meetingsUnlinked: 0,
       portal: 0,
       dataRequests: 0,
+      aiDrafts: 0,
     });
     expect(await getClient(db(), client._id)).toBeNull();
     expect((await getInquiry(db(), message._id))?.clientId).toBeNull();

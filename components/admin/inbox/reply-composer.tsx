@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { replyAction } from "@/app/(admin)/admin/(shell)/inbox/actions";
+import { AiDraft } from "@/components/admin/ai/ai-draft";
 import { useActionRunner } from "@/components/admin/use-action-runner";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -14,12 +15,14 @@ export function ReplyComposer({
   defaultSubject,
   canEmail,
   isSpam,
+  aiDisabledReason,
 }: {
   id: string;
   to: string;
   defaultSubject: string;
   canEmail: boolean;
   isSpam: boolean;
+  aiDisabledReason: string | null;
 }) {
   const { run, pending, message } = useActionRunner();
   const [subject, setSubject] = useState(defaultSubject);
@@ -77,6 +80,22 @@ export function ReplyComposer({
               </p>
             ) : null}
           </div>
+          {isSpam ? null : (
+            <div className="grid gap-2 rounded-md border border-dashed border-line-strong p-3">
+              <p className="text-[13px] font-medium">AI draft</p>
+              <AiDraft
+                body={{ feature: "reply", inquiryId: id }}
+                action="Draft a reply"
+                notes={{
+                  label: "What should the reply say? (optional)",
+                  placeholder: "Available from October; ask about their hosting",
+                }}
+                onUse={(text) => setBody(text)}
+                useLabel="Put it in the message"
+                disabledReason={aiDisabledReason}
+              />
+            </div>
+          )}
           <div className="grid gap-1.5">
             <label htmlFor="reply-body" className="text-[13px] font-medium">
               Message

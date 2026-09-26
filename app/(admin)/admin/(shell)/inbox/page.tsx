@@ -1,3 +1,4 @@
+import { TRIAGE_CATEGORY_LABELS } from "@/lib/ai/schemas";
 import Link from "next/link";
 import { InboxList, type InboxRow } from "@/components/admin/inbox/inbox-list";
 import { PageHeader } from "@/components/admin/shell";
@@ -95,6 +96,17 @@ export default async function InboxPage({
     receivedTitle: formatDateTime(item.receivedAt),
     replied: item.replyCount > 0,
     snoozedUntil: item.snoozedUntil && item.snoozedUntil > at ? formatDateTime(item.snoozedUntil) : null,
+    triage: item.triage?.category
+      ? {
+          label: `${TRIAGE_CATEGORY_LABELS[item.triage.category]}${item.triage.priority === "normal" ? "" : ` · ${item.triage.priority}`}`,
+          tone:
+            item.triage.category === "spam"
+              ? "warning"
+              : item.triage.priority === "high"
+                ? "accent"
+                : "neutral",
+        }
+      : null,
   }));
   const firstShown = total === 0 ? 0 : (params.page - 1) * PAGE_SIZE + 1;
   const lastShown = Math.min(params.page * PAGE_SIZE, total);

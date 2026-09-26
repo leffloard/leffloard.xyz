@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Db } from "mongodb";
+import { TriageCard, type TriageView } from "@/components/admin/ai/triage-card";
 import { CallCard, type CallInfo } from "@/components/admin/inbox/call-card";
 import { ClientCard } from "@/components/admin/inbox/client-card";
 import { LinkifiedText } from "@/components/admin/inbox/linkified-text";
@@ -21,7 +22,11 @@ import {
 } from "@/lib/intake/options";
 import { describeMoment, wallDateTime, zonedInstant } from "@/lib/intake/time";
 import { OPEN_STAGES } from "@/lib/work/options";
+import { TRIAGE_CATEGORY_LABELS } from "@/lib/ai/schemas";
+import { optOutReason } from "@/server/ai/inbox";
+import { aiDisabledReason } from "@/server/ai/settings";
 import { requireAdmin } from "@/server/auth/dal";
+import { publishedContent } from "@/server/content/site";
 import { clientChoices, findClientsByEmail, getClient } from "@/server/clients/store";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
@@ -100,10 +105,35 @@ export default async function InquiryPage({ params }: { params: Promise<{ id: st
   const db = await getDb();
   const inquiry = id ? await getInquiry(db, id) : null;
   if (!inquiry) notFound();
-  const [knownLabels, clientCard] = await Promise.all([listLabels(db), clientCardData(db, inquiry)]);
+  const [knownLabels, clientCard, aiOff, optedOut, content] = await Promise.all([
+    listLabels(db),
+    clientCardData(db, inquiry),
+    aiDisabledReason(db),
+    optOutReason(db, inquiry),
+    publishedContent(),
+  ]);
   const canEmail = channelStatus().clientEmail;
   const at = now();
   const hexId = inquiry._id.toHexString();
+  const aiReason = optedOut ?? aiOff;
+  const triage: TriageView | null = inquiry.triage
+    ? {
+        category: TRIAGE_CATEGORY_LABELS[inquiry.triage.category],
+        priority: inquiry.triage.priority,
+        priorityReason: inquiry.triage.priorityReason,
+        spamLikelihood: inquiry.triage.spamLikelihood,
+        fit: inquiry.triage.fit,
+        service: inquiry.triage.service
+          ? (content.services.find((service) => service.slug === inquiry.triage!.service)?.title ??
+            inquiry.triage.service)
+          : null,
+        summary: inquiry.triage.summary,
+        labels: inquiry.triage.labels,
+        questions: inquiry.triage.questions,
+        flags: inquiry.triage.flags,
+        when: formatRelative(inquiry.triage.at, at),
+      }
+    : null;
 
   const details: [string, string | null][] = [
     ["Service", optionLabel(SERVICE_OPTIONS, inquiry.service)],
@@ -223,11 +253,13 @@ export default async function InquiryPage({ params }: { params: Promise<{ id: st
             defaultSubject={defaultReplySubject(inquiry)}
             canEmail={canEmail}
             isSpam={inquiry.status === "spam"}
+            aiDisabledReason={aiReason}
           />
         </div>
 
         <div className="grid min-w-0 content-start gap-6">
           <StatusPanel id={hexId} status={inquiry.status} visitorName={inquiry.name} canEmail={canEmail} />
+          <TriageCard inquiryId={hexId} triage={triage} labels={inquiry.labels} disabledReason={aiReason} />
           <ClientCard
             inquiryId={hexId}
             isRevision={inquiry.kind === "revision"}

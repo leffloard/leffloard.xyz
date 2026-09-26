@@ -1,4 +1,5 @@
 import type { ObjectId } from "mongodb";
+import type { Triage } from "@/lib/ai/schemas";
 import type { CallSlot } from "@/lib/intake/form";
 import type { InquiryKind, InquiryStatus } from "@/lib/intake/options";
 
@@ -20,6 +21,9 @@ export type ReplyEntry = {
 };
 
 export type StatusChange = { at: Date; status: InquiryStatus; from: InquiryStatus };
+
+// The AI assistant's reading of the message (server/ai/triage.ts): suggestions only, nothing is applied.
+export type InquiryTriage = Triage & { runId: ObjectId; at: Date; model: string };
 
 export type InquiryDoc = {
   _id: ObjectId;
@@ -55,4 +59,5 @@ export type InquiryDoc = {
   purgeAt: Date | null;
   legacyId?: string;
   clientId?: ObjectId | null; // the client it belongs to (missing on messages from before clients existed)
+  triage?: InquiryTriage | null;
 };

@@ -245,6 +245,18 @@ const schema = z.object({
         error: "GITHUB_API_URL must be an http(s) address, such as https://api.github.com.",
       }),
     ),
+  // The AI assistant (Claude). Without a key the assistant is off. ANTHROPIC_BASE_URL is for the tests' mock.
+  ANTHROPIC_API_KEY: optionalText(),
+  ANTHROPIC_BASE_URL: optionalText()
+    .transform((value) => value?.replace(/\/+$/, ""))
+    .pipe(
+      z
+        .url({
+          protocol: /^https?$/,
+          error: "ANTHROPIC_BASE_URL must be an http(s) address; leave it empty to use Anthropic's API.",
+        })
+        .optional(),
+    ),
   // "off" for a second copy of the app (the deploy script's trial start): it serves pages but runs no jobs.
   BACKGROUND_JOBS: optionalText()
     .transform((value) => value?.toLowerCase() ?? "on")

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { INQUIRY_STATUSES, STATUS_LABELS } from "@/lib/intake/options";
+import { LABEL_PATTERN, MAX_LABELS } from "@/lib/intake/labels";
 import { cleanText } from "@/lib/intake/text";
 import { DATE_PATTERN, isCalendarDate, TIME_PATTERN, zonedInstant } from "@/lib/intake/time";
 import { ADMIN_TIME_ZONE } from "@/lib/format";
@@ -196,14 +197,11 @@ export const saveNoteAction = adminAction(
   },
 );
 
-const LABEL = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,23}$/u;
-const MAX_LABELS = 8;
-
 export const saveLabelsAction = adminAction(
   z.object({ id: inquiryId, labels: z.array(z.string().max(200)).max(50) }),
   async (input, { db }) => {
     const labels = [...new Set(input.labels.map((label) => label.trim().toLowerCase()).filter(Boolean))];
-    const bad = labels.find((label) => !LABEL.test(label));
+    const bad = labels.find((label) => !LABEL_PATTERN.test(label));
     if (bad !== undefined) {
       return invalidField(
         "labels",

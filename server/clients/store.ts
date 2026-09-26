@@ -1,4 +1,6 @@
 import "server-only";
+import { aiRuns } from "@/server/ai/collections";
+import { deleteRunsForClient } from "@/server/ai/ledger";
 import { invoices, payments, quotes } from "@/server/billing/collections";
 import { portalLinks, portalSessions, privacyRequests, projectUpdates } from "@/server/portal/collections";
 import { ObjectId, type ClientSession, type Db, type Document, type Filter } from "mongodb";
@@ -518,6 +520,20 @@ export async function exportClient(db: Db, clientId: ObjectId, at: Date = now())
       .sort({ createdAt: 1 })
       .toArray(),
   ]);
+  // Drafts the AI assistant wrote (kept 90 days): about them, their messages and their meetings.
+  const aiDocs = await aiRuns(db)
+    .find(
+      {
+        $or: [
+          { clientId },
+          { "target.kind": "inquiry", "target.id": { $in: messageDocs.map((message) => message._id) } },
+          { "target.kind": "meeting", "target.id": { $in: meetingDocs.map((meeting) => meeting._id) } },
+        ],
+      },
+      { projection: { feature: 1, status: 1, output: 1, createdAt: 1 } },
+    )
+    .sort({ createdAt: 1 })
+    .toArray();
   const paymentDocs = await payments(db)
     .find({ invoiceId: { $in: invoiceDocs.map((invoice) => invoice._id) } }, { projection: { provider: 0 } })
     .sort({ createdAt: 1 })
@@ -538,6 +554,7 @@ export async function exportClient(db: Db, clientId: ObjectId, at: Date = now())
     quotes: quoteDocs,
     invoices: invoiceDocs,
     payments: paymentDocs,
+    aiDrafts: aiDocs,
   };
 }
 
@@ -551,11 +568,13 @@ export type DeletedClient = {
   meetingsUnlinked: number;
   portal: number; // sessions, sign-in links and project updates
   dataRequests: number; // answered by this deletion; the audit log keeps the record
+  aiDrafts: number;
 };
 
-// Deletes a client with their projects, revision rounds, tasks, time, log and portal, all or nothing. Their
-// inbox messages and meetings stay (they follow their own retention) but are no longer linked; quotes,
-// invoices and payments stay as tax law requires.
+// Deletes a client with their projects, revision rounds, tasks, time, log, portal and the AI drafts that
+// used their record, all or nothing. Their inbox messages and meetings stay (they follow their own
+// retention, with the AI drafts about them) but are no longer linked; quotes, invoices and payments stay as
+// tax law requires.
 export async function deleteClient(db: Db, clientId: ObjectId): Promise<DeletedClient | null> {
   return inTransaction(db, async (session) => {
     const client = await clients(db).findOne({ _id: clientId }, { session, projection: { _id: 1 } });
@@ -583,6 +602,7 @@ export async function deleteClient(db: Db, clientId: ObjectId): Promise<DeletedC
         (await portalLinks(db).deleteMany({ clientId }, { session })).deletedCount +
         (await projectUpdates(db).deleteMany(inProject, { session })).deletedCount,
       dataRequests: (await privacyRequests(db).deleteMany({ clientId }, { session })).deletedCount,
+      aiDrafts: await deleteRunsForClient(db, clientId, session),
     };
     await clients(db).deleteOne({ _id: clientId }, { session });
     return deleted;

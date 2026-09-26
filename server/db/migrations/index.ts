@@ -463,4 +463,32 @@ export const migrations: Migration[] = [
       await db.collection("content_previews").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     },
   },
+  {
+    id: "0011",
+    name: "ai-assistant",
+    async up(db) {
+      // The AI assistant's runs (server/ai): kept 90 days; the monthly totals in ai_months stay.
+      const runs = db.collection("ai_runs");
+      await runs.createIndex({ purgeAt: 1 }, { expireAfterSeconds: 0 });
+      await runs.createIndex({ createdAt: -1 });
+      await runs.createIndex({ status: 1, createdAt: 1 });
+      await runs.createIndex({ "target.kind": 1, "target.id": 1, feature: 1, createdAt: -1 });
+      await runs.createIndex({ feature: 1, trigger: 1, createdAt: -1 });
+      await runs.createIndex(
+        { clientId: 1 },
+        { partialFilterExpression: { clientId: { $type: "objectId" } } },
+      );
+      // One running request per feature and target.
+      await runs.createIndex(
+        { lock: 1 },
+        { unique: true, name: "one_running_request", partialFilterExpression: { lock: { $type: "string" } } },
+      );
+      // Daily allowances (automatic triage) expire a day after their day.
+      await db.collection("ai_counters").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+      // Senders who asked for no AI tools, looked up before every AI request about them.
+      await db
+        .collection("inquiries")
+        .createIndex({ aiOptOut: 1 }, { name: "ai_opt_out", partialFilterExpression: { aiOptOut: true } });
+    },
+  },
 ];

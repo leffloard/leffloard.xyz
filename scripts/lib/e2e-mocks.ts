@@ -2,13 +2,21 @@
 //   NOWPayments  /v1/invoice, /v1/payment/:id (API), /checkout/:id (its payment page), and
 //                POST /control/pay {invoiceId, status} which "pays" and sends the signed callback (IPN);
 //   TCMB         /kurlar/today.xml and /kurlar/YYYYMM/DDMMYYYY.xml, with fixed rates on weekdays;
-//   GitHub       /github/users/leffloard/repos, two public repositories and a private one.
-import { createHmac } from "node:crypto";
+//   GitHub       /github/users/leffloard/repos, two public repositories and a private one;
+//   Anthropic    /anthropic/v1/messages (streamed answers per feature, found from the prompt's task) and
+//                /anthropic/v1/models/:id.
+import { createHash, createHmac } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { addDays, todayIn } from "@/lib/intake/time";
 import { weekdayIndex } from "@/lib/work/dates";
 
-type Options = { port: number; apiKey: string; ipnSecret: string; rates: Record<string, string> };
+type Options = {
+  port: number;
+  apiKey: string;
+  ipnSecret: string;
+  rates: Record<string, string>;
+  anthropicKey: string;
+};
 
 type Invoice = { id: string; body: Record<string, unknown> };
 
@@ -31,6 +39,55 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
   return text ? (JSON.parse(text) as Record<string, unknown>) : {};
 }
 
+// A Messages API answer as server-sent events: a thinking block, then the text in a few pieces.
+async function streamAnswer(response: ServerResponse, model: string, text: string, cached: boolean) {
+  response.writeHead(200, { "content-type": "text/event-stream", "request-id": "req_e2e" });
+  const write = (event: Record<string, unknown>) =>
+    response.write(`event: ${String(event.type)}\ndata: ${JSON.stringify(event)}\n\n`);
+  write({
+    type: "message_start",
+    message: {
+      id: "msg_e2e",
+      type: "message",
+      role: "assistant",
+      model,
+      content: [],
+      stop_reason: null,
+      stop_sequence: null,
+      usage: {
+        input_tokens: 800,
+        output_tokens: 1,
+        cache_creation_input_tokens: cached ? 0 : 1500,
+        cache_read_input_tokens: cached ? 1500 : 0,
+      },
+    },
+  });
+  write({
+    type: "content_block_start",
+    index: 0,
+    content_block: { type: "thinking", thinking: "", signature: "" },
+  });
+  write({ type: "content_block_stop", index: 0 });
+  write({ type: "content_block_start", index: 1, content_block: { type: "text", text: "" } });
+  const size = Math.ceil(text.length / 4);
+  for (let at = 0; at < text.length; at += size) {
+    write({
+      type: "content_block_delta",
+      index: 1,
+      delta: { type: "text_delta", text: text.slice(at, at + size) },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
+  write({ type: "content_block_stop", index: 1 });
+  write({
+    type: "message_delta",
+    delta: { stop_reason: "end_turn", stop_sequence: null, stop_details: null },
+    usage: { output_tokens: 250 },
+  });
+  write({ type: "message_stop" });
+  response.end();
+}
+
 function send(response: ServerResponse, status: number, body: unknown, type = "application/json"): void {
   response.writeHead(status, { "content-type": type });
   response.end(typeof body === "string" ? body : JSON.stringify(body));
@@ -47,7 +104,52 @@ function bulletin(day: string, rates: Record<string, string>): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<Tarih_Date Tarih="${date}.${month}.${year}" Date="${month}/${date}/${year}" Bulten_No="${year}/1">\n${currencies}\n</Tarih_Date>\n`;
 }
 
-export function startMocks({ port, apiKey, ipnSecret, rates }: Options): Promise<Server> {
+// Claude's answers, by the task the system prompt ends with (server/ai/prompts.ts).
+const CLAUDE_ANSWERS: [RegExp, string][] = [
+  [
+    /^Task: triage/,
+    JSON.stringify({
+      category: "project",
+      priority: "high",
+      priorityReason: "A clear request with a deadline.",
+      spamLikelihood: 3,
+      fit: "strong",
+      service: "discord-bots",
+      summary: "Wants a moderation bot for a large Discord server.",
+      labels: ["discord bot"],
+      questions: ["How many members does the server have?"],
+      flags: [],
+    }),
+  ],
+  [
+    /^Task: turn a client's request into a draft quote/,
+    JSON.stringify({
+      title: "Moderation bot",
+      lines: [
+        { item: "discord-bots/pro", description: "Moderation bot with tickets and logging", quantity: 1 },
+        { item: null, description: "Hosting setup", quantity: 1 },
+      ],
+      timeline: "1 to 2 weeks",
+      revisions: 2,
+      assumptions: ["One Discord server"],
+      questions: ["Which moderation rules do you need?"],
+    }),
+  ],
+  [
+    /^Task: draft \w+'s email reply/,
+    "Hi Alan,\n\nThanks for your message. A moderation bot like this fits the Pro package, from $480.\n\nMert",
+  ],
+  [/^Task: prepare/, "Who\nA returning guest.\n\nQuestions to ask\n- What is the budget?"],
+  [
+    /^Task: write \w+'s weekly review/,
+    "The week\nOne new message arrived.\n\nNeeds attention\nNothing overdue.\n\nNext week\n- Answer new messages within a day.",
+  ],
+  [/^Task: rewrite/, "A tighter version of the text."],
+  [/^Task: draft a case study/, "A short opening paragraph.\n\n## Context\n\nFrom the facts sheet."],
+];
+
+export function startMocks({ port, apiKey, ipnSecret, rates, anthropicKey }: Options): Promise<Server> {
+  const cachedPrompts = new Set<string>();
   const invoices = new Map<string, Invoice>();
   const payments = new Map<string, Record<string, unknown>>();
   let sequence = 0;
@@ -129,6 +231,43 @@ export function startMocks({ port, apiKey, ipnSecret, rates }: Options): Promise
           body: JSON.stringify(payment),
         });
         return send(response, 200, { paymentId, ipn: { status: answer.status, body: await answer.json() } });
+      }
+
+      // --- Anthropic's API ---
+      if (path.startsWith("/anthropic/v1/")) {
+        if (request.headers["x-api-key"] !== anthropicKey) {
+          return send(response, 401, {
+            type: "error",
+            error: { type: "authentication_error", message: "invalid x-api-key" },
+          });
+        }
+        const model = /^\/anthropic\/v1\/models\/([\w.-]+)$/.exec(path);
+        if (model && request.method === "GET") {
+          return send(response, 200, {
+            type: "model",
+            id: model[1],
+            display_name: "Claude Opus 5",
+            created_at: "2026-01-01T00:00:00Z",
+          });
+        }
+        if (path === "/anthropic/v1/messages" && request.method === "POST") {
+          const body = await readJson(request);
+          const system = (body.system as { text: string }[] | undefined) ?? [];
+          const task = system.at(-1)?.text ?? "";
+          const text = CLAUDE_ANSWERS.find(([pattern]) => pattern.test(task))?.[1] ?? "OK.";
+          // The shared part of the prompt is cached after its first use, as the API does.
+          const key = createHash("sha256")
+            .update(system[0]?.text ?? "")
+            .digest("hex");
+          const cached = cachedPrompts.has(key);
+          cachedPrompts.add(key);
+          await streamAnswer(response, String(body.model), text, cached);
+          return;
+        }
+        return send(response, 404, {
+          type: "error",
+          error: { type: "not_found_error", message: "Not found" },
+        });
       }
 
       // --- GitHub's API ---

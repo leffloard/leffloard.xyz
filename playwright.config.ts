@@ -21,7 +21,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /(admin-(inbox|settings|work)|calendar|billing|portal|content)\.spec\.ts/,
+      testIgnore: /(admin-(inbox|settings|work)|calendar|billing|portal|content|ai)\.spec\.ts/,
       use: chromium,
     },
     {
@@ -61,10 +61,17 @@ export default defineConfig({
       use: chromium,
     },
     {
-      // The content editor: last, as it changes what the public pages show.
+      // The content editor: after the others, as it changes what the public pages show.
       name: "content",
       testMatch: /content\.spec\.ts/,
       dependencies: ["portal"],
+      use: chromium,
+    },
+    {
+      // The AI assistant, against a mock of Anthropic's API: last, as it adds inbox messages.
+      name: "ai",
+      testMatch: /ai\.spec\.ts/,
+      dependencies: ["content"],
       use: chromium,
     },
   ],

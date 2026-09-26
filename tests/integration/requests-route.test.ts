@@ -13,6 +13,7 @@ import { setupTestEnv } from "./env";
 // The v1 request API, ported from tests/test_requests_api.py. See tests/legacy-parity.md.
 
 vi.mock("@/server/notify/kick", () => ({ sendQueuedSoon: vi.fn() }));
+vi.mock("@/server/ai/kick", () => ({ triageSoon: vi.fn() }));
 
 const { db, url, name } = setupTestDb();
 const CHANNELS = {

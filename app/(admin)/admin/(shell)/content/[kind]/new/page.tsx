@@ -5,6 +5,7 @@ import { emptyContent } from "@/lib/content/fields";
 import { KIND_LABELS, isListKind } from "@/lib/content/schemas";
 import { ADMIN_TIME_ZONE } from "@/lib/format";
 import { todayIn } from "@/lib/intake/time";
+import { aiDisabledReason } from "@/server/ai/settings";
 import { requireAdmin } from "@/server/auth/dal";
 import { now } from "@/server/clock";
 import { kindParam } from "@/server/content/admin-pages";
@@ -17,7 +18,8 @@ export default async function NewContentPage({ params }: { params: Promise<{ kin
   await requireAdmin();
   const kind = kindParam((await params).kind);
   if (!kind || !isListKind(kind)) notFound();
-  const options = await workOptions(await getDb());
+  const db = await getDb();
+  const [options, aiOff] = await Promise.all([workOptions(db), aiDisabledReason(db)]);
   return (
     <>
       <PageHeader title={`New ${KIND_LABELS[kind].one.toLowerCase()}`} />
@@ -33,6 +35,7 @@ export default async function NewContentPage({ params }: { params: Promise<{ kin
         livePath={null}
         workOptions={options}
         versions={[]}
+        aiDisabledReason={aiOff}
       />
     </>
   );

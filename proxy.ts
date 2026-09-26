@@ -9,7 +9,11 @@ export function proxy(request: NextRequest): NextResponse {
   const nonce = usesNonce(pathname)
     ? Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64")
     : undefined;
-  const policy = contentSecurityPolicy({ nonce, dev: process.env.NODE_ENV === "development" });
+  const policy = contentSecurityPolicy({
+    nonce,
+    dev: process.env.NODE_ENV === "development",
+    secure: (process.env.SITE_URL ?? "").startsWith("https://"),
+  });
 
   const headers = new Headers(request.headers);
   headers.set("x-request-id", requestId);

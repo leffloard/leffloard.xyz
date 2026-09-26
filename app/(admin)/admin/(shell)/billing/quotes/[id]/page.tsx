@@ -9,6 +9,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { QUOTE_STATE_LABELS, quoteState } from "@/lib/billing/options";
 import { ADMIN_TIME_ZONE, formatDateTime } from "@/lib/format";
 import { todayIn } from "@/lib/intake/time";
+import { quoteAssist } from "@/server/ai/inbox";
 import { requireAdmin } from "@/server/auth/dal";
 import { quoteEditorValue } from "@/server/billing/editor";
 import { billingClients, serviceCatalog } from "@/server/billing/lookups";
@@ -32,7 +33,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const state = quoteState(quote, today);
   const hexId = quote._id.toHexString();
   const draft = quote.status === "draft";
-  const [settings, clients] = await Promise.all([getBillingSettings(db), draft ? billingClients(db) : []]);
+  const [settings, clients, ai] = await Promise.all([
+    getBillingSettings(db),
+    draft ? billingClients(db) : [],
+    draft ? quoteAssist(db, quote.inquiryId) : null,
+  ]);
   const history: [string, React.ReactNode][] = [];
   if (quote.sentAt) history.push(["Sent", formatDateTime(quote.sentAt)]);
   if (quote.viewedAt) history.push(["Opened by the client", formatDateTime(quote.viewedAt)]);
@@ -122,6 +127,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           clients={clients}
           catalog={await serviceCatalog()}
           cryptoReady={false}
+          ai={ai}
         />
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">

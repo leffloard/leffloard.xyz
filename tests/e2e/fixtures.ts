@@ -15,6 +15,8 @@ export const E2E_NOWPAYMENTS = {
   apiKey: "e2e-nowpayments-api-key-not-a-secret",
   ipnSecret: "e2e-nowpayments-ipn-secret-not-a-secret",
 } as const;
+// The key the Anthropic mock accepts.
+export const E2E_ANTHROPIC_KEY = "e2e-anthropic-key-not-a-secret";
 // The mock's TCMB bulletins: lira per unit, every weekday.
 export const E2E_RATES = { USD: "40.0000", EUR: "47.0000", GBP: "52.0000" } as const;
 // Absolute: the standalone server runs in its own folder.

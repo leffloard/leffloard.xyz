@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DocumentEditor } from "@/components/admin/billing/document-editor";
 import { PageHeader } from "@/components/admin/shell";
+import { quoteAssist } from "@/server/ai/inbox";
 import { requireAdmin } from "@/server/auth/dal";
 import { blankEditorValue } from "@/server/billing/editor";
 import { billingClients, serviceCatalog } from "@/server/billing/lookups";
@@ -58,6 +59,7 @@ export default async function NewQuotePage({
         clients={clients}
         catalog={await serviceCatalog()}
         cryptoReady={false}
+        ai={await quoteAssist(db, inquiry?._id ?? null)}
       />
     </>
   );

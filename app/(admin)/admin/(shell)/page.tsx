@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AiDraft } from "@/components/admin/ai/ai-draft";
 import { PageHeader } from "@/components/admin/shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -27,11 +28,13 @@ import { toTaskRow } from "@/server/tasks/view";
 import { countRequests, upcomingMeetings } from "@/server/calendar/meetings";
 import { openPrivacyRequests } from "@/server/portal/privacy";
 import type { MeetingDoc } from "@/server/calendar/types";
+import { briefedMeetings, latestDraft } from "@/server/ai/ledger";
+import { aiDisabledReason } from "@/server/ai/settings";
+import { weekStart } from "@/lib/work/dates";
 
 export const metadata = { title: "Today" };
 
 const ROADMAP = [
-  ["M10", "AI assistant"],
   ["M11", "Analytics, notification centre, command palette"],
   ["M12", "Security tests, load tests and launch"],
 ] as const;
@@ -78,6 +81,14 @@ export default async function TodayPage() {
     countRequests(db, at),
     openPrivacyRequests(db),
   ]);
+  const [aiOff, review, briefed] = await Promise.all([
+    aiDisabledReason(db),
+    latestDraft(db, "weekly", { kind: "week", id: weekStart(today) }),
+    briefedMeetings(
+      db,
+      meetings.map((meeting) => meeting._id),
+    ),
+  ]);
   const channels = channelStatus();
   const profile = toPublicUser(user);
   const warnings = readEnv().warnings;
@@ -95,7 +106,7 @@ export default async function TodayPage() {
     <>
       <PageHeader title={`${greeting(at)}, ${profile.name.split(" ")[0]}`} description={date} />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <AgendaCard meetings={meetings} requests={requests} today={today} at={at} />
+        <AgendaCard meetings={meetings} requests={requests} today={today} at={at} briefed={briefed} />
 
         <Card className="md:col-span-2">
           <CardHeader
@@ -231,6 +242,24 @@ export default async function TodayPage() {
           ) : null}
         </Card>
 
+        <Card className="md:col-span-2">
+          <CardHeader
+            title="Weekly review"
+            description="The last seven days and the next seven: what happened, what needs attention, what to do next."
+          />
+          <CardBody>
+            <AiDraft
+              body={{ feature: "weekly" }}
+              action="Write this week's review"
+              notes={{ label: "Anything to weigh? (optional)", placeholder: "Exams on Thursday and Friday" }}
+              saved={
+                review?.output ? { text: review.output, when: formatRelative(review.createdAt, at) } : null
+              }
+              disabledReason={aiOff}
+            />
+          </CardBody>
+        </Card>
+
         <Card>
           <CardHeader title="System" description="Configuration and database." />
           <CardBody className="grid gap-2.5 text-[13px]">
@@ -348,11 +377,13 @@ function AgendaCard({
   requests,
   today,
   at,
+  briefed,
 }: {
   meetings: MeetingDoc[];
   requests: number;
   today: string;
   at: Date;
+  briefed: Set<string>;
 }) {
   return (
     <Card className="md:col-span-2">
@@ -391,6 +422,7 @@ function AgendaCard({
                   <span className="font-medium">{meeting.name}</span>
                   <span className="text-muted"> · {meeting.title}</span>
                 </Link>
+                {briefed.has(id) ? <Badge>brief ready</Badge> : null}
                 {meeting.status === "requested" ? (
                   <Badge tone="warning">request</Badge>
                 ) : meeting.location.url ? (

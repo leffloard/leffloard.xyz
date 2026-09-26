@@ -11,9 +11,12 @@ export const CSP_REPORT_PATH = "/api/csp-report";
 export type CspOptions = {
   nonce?: string;
   dev: boolean;
+  // The site is served over https (SITE_URL). Only then are http addresses upgraded: a production build
+  // tried locally over plain http would otherwise have the browser fetch its icon over https.
+  secure?: boolean;
 };
 
-export function contentSecurityPolicy({ nonce, dev }: CspOptions): string {
+export function contentSecurityPolicy({ nonce, dev, secure = true }: CspOptions): string {
   const scripts = nonce
     ? ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"]
     : ["'self'", "'unsafe-inline'", TURNSTILE_ORIGIN];
@@ -41,7 +44,7 @@ export function contentSecurityPolicy({ nonce, dev }: CspOptions): string {
     ["report-uri", CSP_REPORT_PATH],
     ["report-to", "csp"],
   ];
-  if (!dev) directives.push(["upgrade-insecure-requests"]);
+  if (!dev && secure) directives.push(["upgrade-insecure-requests"]);
   return directives.map((parts) => parts.join(" ")).join("; ");
 }
 

@@ -5,9 +5,9 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M9, the content editor: the public site's content
-in the database with drafts, previews, scheduled publishing, versions and a leak check; the media library;
-the GitHub sync**.
+This document grows with each milestone. Current state: **M10, the AI assistant: Claude drafts inbox
+triage, replies, quotes, meeting briefs, weekly reviews and content, within a monthly budget, and never
+acts on its own**.
 
 ## Layout
 
@@ -98,7 +98,8 @@ server/                   Server-only code (every file imports "server-only")
   db/migrations/          The ordered migration list
   db/url.ts               Connection-string redaction for messages
 scripts/                  dev-db, migrate, migrate-legacy, backup, restore, admin, start, e2e-server (tsx);
-                          lib/e2e-mocks.ts plays NOWPayments and TCMB in the end-to-end tests
+                          lib/e2e-mocks.ts plays NOWPayments, TCMB, GitHub and Anthropic in the end-to-end
+                          tests
 deploy/                   start-production.cjs (the service's launcher) and the Windows scripts: install,
                           deploy, rollback, smoke, app (see docs/DEPLOY.md)
 tests/
@@ -585,6 +586,61 @@ collections.
   studies show their repository's stars and last update. A repository made private or deleted leaves the
   list at the next sync.
 
+## AI assistant
+
+Claude helps with the owner's writing (M10): it triages inbox messages, drafts replies, quotes, meeting
+briefs, weekly reviews and content, and rewrites a field. `lib/ai` holds the pure parts (features, prices,
+budget arithmetic, answer schemas); `server/ai` is the only code that talks to Anthropic. It is off until
+`ANTHROPIC_API_KEY` is set and the owner switches it on (AI page), and the switch stops every request at
+once.
+
+- **Drafts only.** The model has no tools and changes nothing. A triage is stored beside the message as
+  suggestions (labels are added when the owner clicks); a reply draft goes into the reply form; a quote draft
+  fills the quote editor; a rewrite or case study goes into the content editor unsaved. Sending, saving and
+  publishing (with its leak check) stay the owner's.
+- **One way in.** Every request goes through `runAi()` (`server/ai/engine.ts`): check the switch and the key,
+  reserve the most the request could cost, stream it from Claude, record the run and settle its cost. The
+  official TypeScript SDK is used, on its beta Messages endpoint for the refusal fallback.
+- **The request.** The model is a setting (Claude Opus 5 by default; Claude Sonnet 5 on offer), with
+  adaptive thinking and a fixed effort per feature: low to triage, medium to write, high for a case study.
+  The system prompt is two blocks, both marked for caching: the part every feature shares (who the owner is,
+  how to treat client text, the services, packages and terms from the published content) and the feature's
+  task. They hold no dates or ids, so repeated requests read them from the cache; what changes goes in the
+  user message. Triage and quotes answer in a JSON schema (structured outputs) generated from a zod schema,
+  and the answer is checked again with it. Drafts stream to the page (`POST /admin/ai-stream`, server-sent
+  events) and keep being written if the page is closed; only a finished draft can be taken into a form.
+- **Refusals.** Claude's safety checks can decline harmless work. With fallbacks on (the default), a declined
+  request is answered by the model Anthropic recommends for that case, in the same call
+  (`fallbacks: "default"`); every attempt is billed and recorded. A request declined anyway says so and
+  changes nothing.
+- **Client text is data.** Everything a visitor or client typed, or that may carry their words (a client
+  record made from a message, the titles in the weekly review), reaches the model inside `<untrusted>` tags
+  that the system prompt says never to follow, with anything that looks like one of those tags broken up
+  first. A sender who asked on the form that no AI tools process their message is never sent to the model,
+  and neither is anything about them once they asked on any message (by address or client, spam included).
+  The weekly review sends figures, titles and numbers, no message text and no client names.
+- **Commercial terms come from the catalogue.** A quote draft names catalogue packages by id; their list
+  prices fill the lines (in US dollars; another currency gets the list price as a note to convert), each
+  package once, a monthly plan for whole months, and the main package's timeline and revision rounds. Work
+  the catalogue lacks becomes a line without a price for the owner to set.
+- **The budget.** Each month (UTC, as Anthropic bills) has one document in `ai_months`. Before a request, the
+  most it could cost (its prompt as cache writes, counting a token per byte, every allowed output token,
+  twice with fallbacks) is reserved by one conditional update that only succeeds while spent + reserved +
+  this stays within the budget, so two requests at once can't overspend. When it ends, the reservation is
+  swapped, in the month it was taken from, for the cost worked out from the returned token counts (per
+  attempt, at each model's price, cache reads and writes included). The final count only comes at the end,
+  so a request that breaks off mid-answer, or whose server stopped (closed after 30 minutes), is counted at
+  its reservation. The owner can add a finished month to the finance expenses.
+- **Runs.** `ai_runs` keeps each request: feature, target, model, tokens, cost, the draft, the outcome. A
+  unique index lets one request per feature and target run at a time. Runs are deleted after 90 days; runs
+  about a message or meeting go with it (within the hour when its own retention removes it), and a meeting
+  brief, which uses the client's record, with the client. One still running when its subject is deleted
+  settles its cost, then deletes itself. A client's data export includes the drafts about them, their
+  messages and their meetings.
+- **Automatic triage** of new messages is an option (off by default), run after the visitor has their
+  answer, at most 20 a day (a counter taken before each request), never for spam or a sender who opted
+  out.
+
 ## Operations
 
 The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
@@ -625,16 +681,19 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
   the admin's pages are checked with axe as the tests go through them.
 - Admin tests that share data run in order: the sign-in tests, then the inbox and settings, then the work
   modules, then booking and the calendar, then billing, then the portal, then the content editor, which
-  changes what public pages show (Playwright project dependencies in `playwright.config.ts`). The calendar tests book as visitors in London and New York, and check the invites
+  changes what public pages show, then the AI assistant (Playwright project dependencies in
+  `playwright.config.ts`). The calendar tests book as visitors in London and New York, and check the invites
   the emails carry; the billing tests go from a quote to a crypto payment, a bank transfer and its refund, a
   care plan, an expense and the accountant's CSV; the portal tests go from the owner's invitation to the
   client's sign-in, revision rounds (one of them extra), a data request and the owner's answer.
 - The integration tests' `mongod` closes idle files and checkpoints every second: every test file rebuilds
   its database before each test, and WiredTiger would otherwise hold thousands of files and abort at the
   open files limit.
-- NOWPayments, TCMB and GitHub are played by a local mock in the end-to-end tests
+- NOWPayments, TCMB, GitHub and Anthropic are played by a local mock in the end-to-end tests
   (`scripts/lib/e2e-mocks.ts`): it serves NOWPayments' API and payment page, sends signed callbacks when a
-  test "pays", serves fixed bulletins and a list of repositories. The integration tests stub `fetch` instead.
+  test "pays", serves fixed bulletins, a list of repositories, and Claude's streamed answers per feature
+  (with the cache used from the second request). The integration tests stub `fetch` instead; for Claude they
+  pass the stub to the real SDK (`tests/helpers/anthropic.ts`), so its streaming and errors are exercised.
 - Offline machines can use local binaries: `MONGOMS_SYSTEM_BINARY=/path/to/mongod`,
   `PW_CHROMIUM_PATH=/path/to/chrome`.
 
@@ -683,6 +742,7 @@ Every direct dependency and why it is here.
 | `nodemailer`                                                                                    | Sends email over SMTP (STARTTLS, TLS or plain), with correct encoding of non-ASCII names and subjects.                |
 | `croner`                                                                                        | Runs the background jobs (outbox, backups, reminders, rates, recurring invoices) without overlapping runs.            |
 | `sharp`                                                                                         | Re-encodes uploaded images (upright, scaled, WebP, metadata dropped); Next.js already depends on it.                  |
+| `@anthropic-ai/sdk`                                                                             | Anthropic's official client for Claude: streaming, structured outputs, typed errors and the refusal fallback.         |
 
 ## Decisions
 
@@ -768,3 +828,14 @@ Every direct dependency and why it is here.
     restores include them with no second folder to copy, and their hash is their address.
 33. **The leak check has no override.** A publication it stops is edited, not forced; the owner's own list
     of words covers what no pattern can know (client names, private domains).
+34. **The AI writes drafts and has no tools** (M10). Everything it produces lands in a form the owner
+    submits, so a wrong or manipulated answer costs a moment's reading, never an email sent or a price
+    promised. Tools would add little to these tasks and a lot to what a prompt injection could do.
+35. **The budget is a reservation, not a tally.** Adding costs after the fact lets a burst of requests pass
+    the limit before any of them is counted; reserving each request's worst case in one conditional update
+    makes the cap hold, at the price of refusing a little early near the end of a month.
+36. **Structured outputs for answers code uses, and prices never from the model.** Triage and quotes come
+    back in a schema and are checked again; a quote's prices are looked up in the catalogue by the ids the
+    model chose, so the model can't set one.
+37. **Client text is marked as data, and opting out means never sent.** The form's "no AI tools" choice is
+    honoured before any request is built, not by asking the model to ignore the text.

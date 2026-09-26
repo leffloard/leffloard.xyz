@@ -10,6 +10,7 @@ import { createOwner } from "@/server/auth/users";
 import { seedContent } from "@/server/content/seed";
 import { runMigrations } from "@/server/db/migrate";
 import {
+  E2E_ANTHROPIC_KEY,
   E2E_BACKUP_DIR,
   E2E_BACKUP_KEY,
   E2E_BASE_URL,
@@ -57,6 +58,7 @@ async function main(): Promise<void> {
     apiKey: E2E_NOWPAYMENTS.apiKey,
     ipnSecret: E2E_NOWPAYMENTS.ipnSecret,
     rates: E2E_RATES,
+    anthropicKey: E2E_ANTHROPIC_KEY,
   });
 
   const server = spawn(process.execPath, [STANDALONE_SERVER], {
@@ -83,6 +85,8 @@ async function main(): Promise<void> {
       NOWPAYMENTS_API_URL: `${E2E_MOCK_URL}/v1`,
       TCMB_RATES_URL: `${E2E_MOCK_URL}/kurlar`,
       GITHUB_API_URL: `${E2E_MOCK_URL}/github`,
+      ANTHROPIC_API_KEY: E2E_ANTHROPIC_KEY,
+      ANTHROPIC_BASE_URL: `${E2E_MOCK_URL}/anthropic`,
       LOG_LEVEL: process.env.LOG_LEVEL ?? "warn",
     },
   });

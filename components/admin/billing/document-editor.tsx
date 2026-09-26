@@ -6,6 +6,7 @@ import {
   saveQuoteAction,
   saveRecurringAction,
 } from "@/app/(admin)/admin/(shell)/billing/actions";
+import { QuoteAssist } from "@/components/admin/ai/quote-assist";
 import { controlProps, FormRow } from "@/components/admin/form-row";
 import { useActionRunner } from "@/components/admin/use-action-runner";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import {
   type LineItem,
   type ScheduleKey,
 } from "@/lib/billing/document";
+import type { QuoteSuggestion } from "@/lib/ai/schemas";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, type PaymentMethod } from "@/lib/billing/options";
 import {
   RECURRING_INTERVAL_LABELS,
@@ -119,6 +121,7 @@ export function DocumentEditor({
   projects = [],
   catalog,
   cryptoReady,
+  ai = null,
 }: {
   kind: "quote" | "invoice" | "credit" | "recurring";
   id: string | null;
@@ -128,6 +131,8 @@ export function DocumentEditor({
   projects?: { id: string; label: string; clientId: string }[];
   catalog: CatalogItem[];
   cryptoReady: boolean;
+  // A quote made from an inbox message: the AI can suggest its lines.
+  ai?: { inquiryId: string; disabledReason: string | null } | null;
 }) {
   const { run, pending, message } = useActionRunner();
   const [value, setValue] = useState(initial);
@@ -168,6 +173,29 @@ export function DocumentEditor({
         : current.recipient,
       currency: client && current.lines.every((line) => !line.unitPrice) ? client.currency : current.currency,
     }));
+  }
+
+  // The AI's lines replace a blank first line, or follow the lines already there; the title, timeline and
+  // revision rounds are filled in only while the timeline is still empty.
+  function applySuggestion(suggestion: QuoteSuggestion) {
+    setValue((current) => {
+      const blank = current.lines.every((line) => !line.description.trim() && !line.unitPrice.trim());
+      const added = suggestion.lines.map((line) => ({
+        ...newLine(),
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+      }));
+      const lines = (blank ? added : [...current.lines, ...added]).slice(0, MAX_LINES);
+      const fresh = !current.timeline.trim();
+      return {
+        ...current,
+        title: current.title.trim() ? current.title : suggestion.title,
+        lines: lines.length ? lines : current.lines,
+        timeline: fresh ? suggestion.timeline : current.timeline,
+        revisionsIncluded: fresh ? suggestion.revisionsIncluded : current.revisionsIncluded,
+      };
+    });
   }
 
   const preview = useMemo(() => {
@@ -374,6 +402,14 @@ export function DocumentEditor({
             </FormRow>
           </div>
 
+          {quote && ai ? (
+            <QuoteAssist
+              inquiryId={ai.inquiryId}
+              currency={value.currency}
+              disabledReason={ai.disabledReason}
+              onApply={applySuggestion}
+            />
+          ) : null}
           <fieldset className="grid gap-3">
             <legend className="mb-1 text-[13px] font-medium text-ink/90">Lines</legend>
             <div className="hidden grid-cols-[minmax(0,1fr)_80px_130px_120px_32px] gap-2 text-xs text-muted sm:grid">

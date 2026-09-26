@@ -34,6 +34,9 @@ const LABELS: Record<string, string> = {
   "billing.payment.recorded": "Payment recorded by hand",
   "billing.payment.refunded": "Refund recorded",
   "finance.exported": "Finance CSV exported",
+  "content.published": "Content published",
+  "content.deleted": "Content deleted",
+  "ai.settings.changed": "AI assistant settings changed",
 };
 
 const WARNINGS = new Set([

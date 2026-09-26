@@ -11,6 +11,7 @@ import {
   scheduleContentAction,
   unpublishContentAction,
 } from "@/app/(admin)/admin/(shell)/content/actions";
+import { ContentAssistant } from "@/components/admin/ai/content-assistant";
 import { ContentFields, type WorkOption } from "@/components/admin/content/content-form";
 import { useActionRunner } from "@/components/admin/use-action-runner";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,7 @@ type Props = {
   livePath: string | null;
   workOptions: WorkOption[];
   versions: VersionRow[];
+  aiDisabledReason: string | null;
 };
 
 export function ContentEditor(props: Props) {
@@ -284,6 +286,13 @@ export function ContentEditor(props: Props) {
             )}
           </CardBody>
         </Card>
+        <ContentAssistant
+          kind={kind}
+          id={id}
+          value={value}
+          onReplace={(field, text) => setValue((current) => ({ ...current, [field]: text }))}
+          disabledReason={props.aiDisabledReason}
+        />
         {id ? (
           <Card>
             <CardHeader title="Earlier versions" description="Copies that were on the site before." />

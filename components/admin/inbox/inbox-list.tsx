@@ -19,6 +19,7 @@ export type InboxRow = {
   receivedTitle: string;
   replied: boolean;
   snoozedUntil: string | null;
+  triage: { label: string; tone: "neutral" | "accent" | "warning" } | null; // the AI triage's reading
 };
 
 function isTyping(target: EventTarget | null): boolean {
@@ -102,6 +103,12 @@ export function InboxList({ rows, emptyText }: { rows: InboxRow[]; emptyText: st
                   {row.subject}
                 </span>
                 {row.replied ? <Badge tone="accent">replied</Badge> : null}
+                {row.triage ? (
+                  <Badge tone={row.triage.tone}>
+                    <span className="sr-only">AI triage: </span>
+                    {row.triage.label}
+                  </Badge>
+                ) : null}
                 {row.labels.map((label) => (
                   <Badge key={label}>{label}</Badge>
                 ))}

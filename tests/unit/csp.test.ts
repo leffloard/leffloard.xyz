@@ -30,6 +30,12 @@ describe("contentSecurityPolicy", () => {
     expect(policy).not.toContain("'unsafe-eval'");
   });
 
+  it("upgrades http addresses only on a site served over https", () => {
+    const local = directives(contentSecurityPolicy({ nonce: "abc123", dev: false, secure: false }));
+    expect(local.has("upgrade-insecure-requests")).toBe(false);
+    expect(local.get("script-src")).toEqual(["'self'", "'nonce-abc123'", "'strict-dynamic'"]);
+  });
+
   it("relaxes only what development needs", () => {
     const policy = directives(contentSecurityPolicy({ nonce: "abc123", dev: true }));
     expect(policy.get("script-src")).toContain("'unsafe-eval'");

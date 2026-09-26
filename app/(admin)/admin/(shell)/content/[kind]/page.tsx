@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/admin/shell";
 import { buttonClasses } from "@/components/ui/button";
 import { KIND_LABELS, isListKind } from "@/lib/content/schemas";
 import { formatDateTime } from "@/lib/format";
+import { aiDisabledReason } from "@/server/ai/settings";
 import { requireAdmin } from "@/server/auth/dal";
 import { kindParam } from "@/server/content/admin-pages";
 import { getSingleton, listContent, listVersions } from "@/server/content/editor";
@@ -32,7 +33,11 @@ export default async function ContentKindPage({ params }: { params: Promise<{ ki
   if (!isListKind(kind)) {
     const doc = await getSingleton(db, kind);
     if (!doc) notFound();
-    const [versions, options] = await Promise.all([listVersions(db, doc._id), workOptions(db)]);
+    const [versions, options, aiOff] = await Promise.all([
+      listVersions(db, doc._id),
+      workOptions(db),
+      aiDisabledReason(db),
+    ]);
     const paths = contentPaths(doc);
     return (
       <>
@@ -49,6 +54,7 @@ export default async function ContentKindPage({ params }: { params: Promise<{ ki
           livePath={paths.live}
           workOptions={options}
           versions={versionRows(versions)}
+          aiDisabledReason={aiOff}
         />
       </>
     );

@@ -150,6 +150,32 @@ v1 data is only read, never changed.
   the work page should list; case studies show their repository's stars either way. Optional:
   `GITHUB_TOKEN` (a fine-grained token with no permissions) raises GitHub's hourly limit.
 
+### The AI assistant (`/admin/ai`)
+
+Claude drafts; you decide. Nothing it writes is sent, saved or published without your click.
+
+- **Setting up**: create an API key at console.anthropic.com (set a spend limit there too), put it in
+  `ANTHROPIC_API_KEY` on the server and restart. On the **AI** page tick **The AI assistant is on**, check the
+  monthly budget (US dollars, $15 to start) and **Save**; **Check the key** confirms the key and the model.
+  Unticking the box stops every AI request at once.
+- **Inbox**: **Triage with AI** on a message says what it is, how urgent, how well it fits and what to ask;
+  **Add these labels** adds its labels. **Draft a reply** writes a reply as you watch (tell it what to say in
+  the notes); **Put it in the message** copies it into the reply, which you edit and send.
+- **Quotes**: on a quote made from a message, **Suggest lines with AI** picks packages from your services;
+  their prices come from your price list, never from the AI. Lines it can't match have no price: set it.
+- **Meetings**: **Prepare a brief** on a meeting's page sums up the guest, their messages and history, and
+  what to ask. Meetings with a brief show *brief ready* on Today.
+- **Today**: **Write this week's review** looks at the last and next seven days.
+- **Content**: **AI writing help** beside the editor rewrites a field, or drafts a case study from a facts
+  sheet you fill in. The text goes into the form unsaved; the leak check still runs when you publish.
+- **Costs**: the AI page shows this month's spending against the budget, how much came from the cache, each
+  request with its cost and draft, and past months, which **Add to expenses** puts into the finance expenses
+  (check the amount against Anthropic's invoice). A request that could take the month past the budget is not
+  made.
+- **Privacy**: once someone ticks "Don't use AI tools on my message", none of their messages and nothing
+  about them (a meeting brief) is sent to the AI. Drafts are kept 90 days, or less with the message they are
+  about.
+
 ### The client portal (`/portal`)
 
 - **Inviting a client**: **Invite to the portal** on the client's page emails them a sign-in link valid for a

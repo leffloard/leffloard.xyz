@@ -102,8 +102,10 @@ export default function PrivacyPage() {
           nothing from your booking is sent to Jitsi, but it carries the call itself.
         </li>
         <li>
-          Anthropic (Claude): only when I use an AI assistant to sort messages or draft replies, and never for
-          a message whose sender ticked &ldquo;Don&apos;t use AI tools on my message&rdquo;.
+          Anthropic (Claude): only when I use my AI assistant to sort a message or draft a reply, a quote or a
+          brief before a call, and then only the text that draft needs. Under its commercial terms Anthropic
+          does not train its models on it. Never for a message whose sender ticked &ldquo;Don&apos;t use AI
+          tools on my message&rdquo;, and never about someone who ticked it on any message.
         </li>
         <li>Cloudflare: network, security and bot checks (Turnstile) for the site.</li>
         <li>
@@ -120,8 +122,10 @@ export default function PrivacyPage() {
         provider&apos;s notifications about a payment are kept for about 13 months. Security logs are kept for
         up to 12 months. A sign-in link for the client portal works once and expires after 20 minutes (an
         invitation after 7 days); a portal sign-in ends after 7 days without use and is deleted at the latest
-        30 days after it started. Project updates and your data requests are kept with your client record. A
-        testimonial stays on the site until the person asks me to take it down.
+        30 days after it started. Project updates and your data requests are kept with your client record.
+        Drafts written with the AI assistant are deleted after 90 days, or earlier with the message they are
+        about; its short summary of a message is kept, and deleted, with the message. A testimonial stays on
+        the site until the person asks me to take it down.
       </p>
       <h2>Your rights</h2>
       <p>

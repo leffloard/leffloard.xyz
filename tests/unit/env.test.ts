@@ -46,6 +46,8 @@ describe("readEnv", () => {
         TCMB_RATES_URL: "https://www.tcmb.gov.tr/kurlar",
         GITHUB_TOKEN: undefined,
         GITHUB_API_URL: "https://api.github.com",
+        ANTHROPIC_API_KEY: undefined,
+        ANTHROPIC_BASE_URL: undefined,
         BACKGROUND_JOBS: "on",
       },
     });

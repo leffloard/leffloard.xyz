@@ -1,5 +1,6 @@
 import "server-only";
 import { Cron } from "croner";
+import { purgeOrphanRuns } from "@/server/ai/ledger";
 import { runBackup } from "@/server/backup/service";
 import { reconcileCryptoPayments } from "@/server/billing/ipn";
 import { nowPaymentsConfig } from "@/server/billing/nowpayments";
@@ -23,6 +24,16 @@ import { drainOutbox } from "@/server/notify/outbox";
 type Job = { name: string; pattern: string; run: () => Promise<void> };
 
 const JOBS: Job[] = [
+  {
+    // AI drafts about an inbox message or meeting that was deleted by its own retention (spam after 30
+    // days, say) go soon after it (server/ai/ledger.ts).
+    name: "ai-cleanup",
+    pattern: "35 * * * *",
+    run: async () => {
+      const removed = await purgeOrphanRuns(await getDb());
+      if (removed) log.info({ removed }, "AI drafts about deleted items removed");
+    },
+  },
   {
     // Publishes content the owner scheduled (server/content/editor.ts).
     name: "content-publish",

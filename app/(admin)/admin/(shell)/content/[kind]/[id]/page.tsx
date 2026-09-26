@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/admin/shell";
 import { Notice } from "@/components/ui/notice";
 import { KIND_LABELS } from "@/lib/content/schemas";
 import { formatDateTime } from "@/lib/format";
+import { aiDisabledReason } from "@/server/ai/settings";
 import { requireAdmin } from "@/server/auth/dal";
 import { kindParam } from "@/server/content/admin-pages";
 import { contentTitle, getContent, listVersions } from "@/server/content/editor";
@@ -29,7 +30,11 @@ export default async function EditContentPage({
   const db = await getDb();
   const doc = await getContent(db, id);
   if (!doc || doc.kind !== kind) notFound();
-  const [versions, options] = await Promise.all([listVersions(db, doc._id), workOptions(db)]);
+  const [versions, options, aiOff] = await Promise.all([
+    listVersions(db, doc._id),
+    workOptions(db),
+    aiDisabledReason(db),
+  ]);
   const paths = contentPaths(doc);
   const created = (await searchParams).created === "1";
   return (
@@ -59,6 +64,7 @@ export default async function EditContentPage({
         livePath={paths.live}
         workOptions={options}
         versions={versionRows(versions)}
+        aiDisabledReason={aiOff}
       />
     </>
   );

@@ -4,8 +4,15 @@ import { ObjectId, type Db, type Document, type Filter } from "mongodb";
 import type { InquiryInput } from "@/lib/intake/form";
 import { INQUIRY_STATUSES, type InquiryKind, type InquiryStatus } from "@/lib/intake/options";
 import { escapeRegex } from "@/lib/search";
+import { deleteRunsFor } from "@/server/ai/ledger";
 import { now } from "@/server/clock";
-import type { InquiryDoc, InquirySource, ReplyEntry, StatusChange } from "@/server/inquiries/types";
+import type {
+  InquiryDoc,
+  InquirySource,
+  InquiryTriage,
+  ReplyEntry,
+  StatusChange,
+} from "@/server/inquiries/types";
 
 // Reading and changing inquiries. The only module that queries the collection; pages and actions call
 // these functions with validated values.
@@ -131,7 +138,7 @@ export type InboxQuery = {
 export type InboxItem = Pick<
   InquiryDoc,
   "_id" | "ref" | "kind" | "status" | "name" | "email" | "subject" | "labels" | "receivedAt" | "snoozedUntil"
-> & { snippet: string; replyCount: number };
+> & { snippet: string; replyCount: number; triage?: Pick<InquiryTriage, "category" | "priority"> };
 
 export type InboxCounts = Record<InboxView, number>;
 
@@ -218,6 +225,8 @@ export async function listInquiries(
             snoozedUntil: 1,
             snippet: { $substrCP: ["$message", 0, 160] },
             replyCount: { $size: { $ifNull: ["$replies", []] } },
+            "triage.category": 1,
+            "triage.priority": 1,
           },
         },
       ] as Document[])
@@ -333,9 +342,16 @@ export async function addReply(db: Db, id: ObjectId, reply: ReplyEntry): Promise
   );
 }
 
+// Deletes a message with the AI assistant's drafts about it.
 export async function deleteInquiry(db: Db, id: ObjectId): Promise<boolean> {
   const result = await inquiries(db).deleteOne({ _id: id });
+  await deleteRunsFor(db, { kind: "inquiry", id });
   return result.deletedCount === 1;
+}
+
+export async function setTriage(db: Db, id: ObjectId, triage: InquiryTriage): Promise<boolean> {
+  const result = await inquiries(db).updateOne({ _id: id }, { $set: { triage } });
+  return result.matchedCount === 1;
 }
 
 export async function listLabels(db: Db): Promise<string[]> {

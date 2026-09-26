@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AiDraft } from "@/components/admin/ai/ai-draft";
 import { MeetingActions, MeetingClient, MeetingNote } from "@/components/admin/calendar/meeting-panel";
 import { PageHeader } from "@/components/admin/shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ADMIN_TIME_ZONE, formatDateTime } from "@/lib/format";
+import { ADMIN_TIME_ZONE, formatDateTime, formatRelative } from "@/lib/format";
 import { describeMoment, wallDateTime } from "@/lib/intake/time";
+import { latestDraft } from "@/server/ai/ledger";
+import { aiDisabledReason } from "@/server/ai/settings";
 import { requireAdmin } from "@/server/auth/dal";
 import { getMeeting } from "@/server/calendar/meetings";
 import type { MeetingStatus } from "@/server/calendar/types";
@@ -31,10 +34,13 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
   const meeting = id ? await getMeeting(db, id) : null;
   if (!meeting) notFound();
   const at = now();
-  const [client, choices] = await Promise.all([
+  const [client, choices, aiOff, brief] = await Promise.all([
     meeting.clientId ? getClient(db, meeting.clientId) : null,
     clientChoices(db),
+    aiDisabledReason(db),
+    latestDraft(db, "brief", { kind: "meeting", id: meeting._id }),
   ]);
+  const live = meeting.status === "requested" || meeting.status === "confirmed";
   const hexId = meeting._id.toHexString();
   const ownerWall = wallDateTime(meeting.startsAt, ADMIN_TIME_ZONE);
   const status = STATUS[meeting.status];
@@ -135,6 +141,28 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
               ) : null}
             </CardBody>
           </Card>
+          {live ? (
+            <Card>
+              <CardHeader
+                title="AI brief"
+                description="Who they are, what they want and what to ask, from what this site knows about them."
+              />
+              <CardBody>
+                <AiDraft
+                  body={{ feature: "brief", meetingId: hexId }}
+                  action="Prepare a brief"
+                  notes={{
+                    label: "Anything to focus on? (optional)",
+                    placeholder: "Their budget; whether they need hosting",
+                  }}
+                  saved={
+                    brief?.output ? { text: brief.output, when: formatRelative(brief.createdAt, at) } : null
+                  }
+                  disabledReason={aiOff}
+                />
+              </CardBody>
+            </Card>
+          ) : null}
           <MeetingActions
             id={hexId}
             status={meeting.status}

@@ -90,3 +90,10 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
   was not rendered and sanitized by `server/content/render.ts`.
 - Uploaded images go only through `storeImage()` (`server/content/media.ts`): recognised by their bytes,
   re-encoded, served from `/media/<sha256>.webp`. Never serve an upload as it arrived.
+- Every AI request goes through `runAi()` (`server/ai/engine.ts`), which checks the switch, reserves the
+  budget and records the run. The AI writes drafts only: no tools, and nothing it returns is sent, saved,
+  published or priced without the owner. Visitor and client text goes into prompts only inside `untrusted()`
+  (`lib/ai/untrusted.ts`); never send a message whose sender set `aiOptOut`. Keep the system prompt blocks
+  free of dates, ids and anything else that changes per request (they are cached). Prices in AI drafts come
+  from the catalogue, never from the model. Tests use `tests/helpers/anthropic.ts` (a stubbed fetch) and
+  never call Anthropic.

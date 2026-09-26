@@ -102,7 +102,8 @@ export type AuditAction =
   | "billing.payment.refunded"
   | "finance.exported"
   | "content.published"
-  | "content.deleted";
+  | "content.deleted"
+  | "ai.settings.changed";
 
 export type AuditDoc = {
   _id: ObjectId;
