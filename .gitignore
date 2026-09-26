@@ -8,10 +8,25 @@ frontend/dist/
 build/
 frontend/build/
 
-# Environment
+# Environment (only the examples are tracked)
 .env
+.env.*
+!.env.example
 backend/.env
 *.local
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Tests and local data
+coverage/
+playwright-report/
+test-results/
+.data/
+research/
 
 # Python
 __pycache__/

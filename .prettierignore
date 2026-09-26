@@ -1,0 +1,13 @@
+# The v1 app keeps its own formatting until it is removed after the cut-over.
+frontend/
+backend/
+tests/*.py
+README.md
+egefitnessalwaysinbussinies.bat
+
+.next/
+.data/
+coverage/
+playwright-report/
+test-results/
+package-lock.json

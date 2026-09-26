@@ -1,5 +1,49 @@
 # leffloard.xyz - Personal Portfolio and Blog
 
+> **v2 is being built.** A new Next.js app at the repository root replaces `frontend/` and `backend/`,
+> milestone by milestone. Until the cut-over, everything below the [v2 section](#v2-in-progress) still
+> describes the live v1 site.
+
+## v2 (in progress)
+
+One Next.js 16 app (TypeScript, Tailwind 4, MongoDB) for the public site, the client portal and the admin
+system. Design, decisions and dependencies: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### Run it locally
+
+Requirements: Node.js 22.12 or newer (24 LTS recommended, see `.nvmrc`). Nothing else: the local database is
+downloaded on the first start (about 100 MB).
+
+1. In the repository root (not in `frontend/`): `npm install`
+2. `npm run dev:db` starts a local MongoDB and creates `.env.local` for it. Keep this terminal open.
+3. In a second terminal: `npm run dev`, then open http://localhost:3000.
+
+Development never touches the production Atlas database. The local data lives in `.data/dev-db`; delete that
+folder to start empty.
+
+### Useful commands
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev:db` | Local MongoDB (replica set) on port 27027, applies migrations |
+| `npm run dev` | Development server with hot reload |
+| `npm run migrate` | Applies pending migrations to the database in `MONGO_URL` (`npm run migrate -- --status` only lists them) |
+| `npm run build`, then `npm start` | Production build, started the way the server runs it |
+| `npm run lint`, `npm run typecheck`, `npm run format` | Code checks and formatting |
+| `npm run test:unit`, `npm run test:integration` | Tests (the integration tests start their own MongoDB) |
+| `npm run build`, then `npm run test:e2e` | Browser tests (first time: `npx playwright install chromium`) |
+
+### Configuration
+
+Every variable is documented in [`.env.example`](.env.example). The app checks them when it starts and prints
+a plain-English list of anything wrong (for example a doubled `MONGO_URL=`), instead of a stack trace.
+Health check: `GET /api/health` (public) and `GET /api/health?deep=1` with the `x-health-token` header set to
+`HEALTH_TOKEN` (configuration, database and migrations).
+
+---
+
+# v1 (current live site)
+
 A personal portfolio and blog web application built with a modern web stack. The project features a React (Vite) frontend, a FastAPI backend, and a MongoDB database.
 
 ---

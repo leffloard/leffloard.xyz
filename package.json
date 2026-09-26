@@ -1,0 +1,55 @@
+{
+  "name": "leffloard-xyz",
+  "version": "2.0.0-dev",
+  "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "dev:db": "tsx --conditions=react-server scripts/dev-db.ts",
+    "build": "next build",
+    "start": "tsx scripts/start.ts",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "playwright test",
+    "migrate": "tsx --conditions=react-server scripts/migrate.ts"
+  },
+  "dependencies": {
+    "geist": "^1.7.2",
+    "mongodb": "^7.6.0",
+    "next": "16.3.6",
+    "pino": "^10.3.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@next/env": "^16.3.6",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.6",
+    "mongodb-memory-server": "^11.3.0",
+    "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  },
+  "config": {
+    "mongodbMemoryServer": {
+      "version": "8.0.32"
+    }
+  }
+}
