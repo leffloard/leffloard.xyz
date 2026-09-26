@@ -95,7 +95,12 @@ export type AuditAction =
   | "inbox.legacy.migrated"
   | "clients.client.exported"
   | "clients.client.deleted"
-  | "projects.project.deleted";
+  | "projects.project.deleted"
+  | "billing.bank.changed"
+  | "billing.invoice.voided"
+  | "billing.payment.recorded"
+  | "billing.payment.refunded"
+  | "finance.exported";
 
 export type AuditDoc = {
   _id: ObjectId;

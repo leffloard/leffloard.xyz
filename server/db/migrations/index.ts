@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { Db } from "mongodb";
+import type { Db, Document } from "mongodb";
 
 export type Migration = {
   id: string;
@@ -10,6 +10,43 @@ export type Migration = {
 // Forward-only and additive ("expand, then contract"): the release before a migration must keep
 // working on the migrated schema, so deploys can roll back without a down migration.
 // A migration that fails is not recorded and runs again next time, so each one must be safe to repeat.
+
+// Creates a collection with a $jsonSchema validator, or puts the validator on one that exists. The database
+// then refuses a malformed billing document even if a bug in the app tried to write one.
+async function withValidator(db: Db, name: string, schema: Document): Promise<void> {
+  const validator = { $jsonSchema: schema };
+  const exists = (await db.listCollections({ name }, { nameOnly: true }).toArray()).length > 0;
+  if (exists) {
+    await db.command({ collMod: name, validator, validationLevel: "strict", validationAction: "error" });
+  } else {
+    await db.createCollection(name, { validator, validationLevel: "strict", validationAction: "error" });
+  }
+}
+
+const WHOLE_NUMBER = { bsonType: ["int", "long", "double"], multipleOf: 1 };
+const AMOUNT = { ...WHOLE_NUMBER, minimum: 0, maximum: 100_000_000_000 };
+const CURRENCY = { enum: ["USD", "EUR", "TRY", "GBP"] };
+const PUBLIC_ID = { bsonType: "string", pattern: "^[0-9A-Za-z]{22}$" };
+const DATE_TEXT = { bsonType: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" };
+const LINES = {
+  bsonType: "array",
+  maxItems: 50,
+  items: {
+    bsonType: "object",
+    required: ["id", "description", "quantityMilli", "unitMinor"],
+    properties: {
+      description: { bsonType: "string", maxLength: 2000 },
+      quantityMilli: { ...WHOLE_NUMBER, minimum: 1 },
+      unitMinor: AMOUNT,
+    },
+  },
+};
+const TOTALS = {
+  bsonType: "object",
+  required: ["subtotalMinor", "discountMinor", "taxes", "totalMinor"],
+  properties: { subtotalMinor: AMOUNT, discountMinor: AMOUNT, totalMinor: AMOUNT },
+};
+
 export const migrations: Migration[] = [
   {
     id: "0001",
@@ -184,6 +221,195 @@ export const migrations: Migration[] = [
           },
         ]);
       }
+    },
+  },
+  {
+    id: "0007",
+    name: "billing",
+    async up(db) {
+      await withValidator(db, "quotes", {
+        bsonType: "object",
+        required: ["publicId", "status", "clientId", "currency", "lines", "totals", "schedule", "version"],
+        properties: {
+          publicId: PUBLIC_ID,
+          status: { enum: ["draft", "sent", "accepted", "declined", "withdrawn"] },
+          number: { bsonType: ["string", "null"], pattern: "^Q-\\d{4}-\\d{4,}$" },
+          clientId: { bsonType: "objectId" },
+          currency: CURRENCY,
+          lines: LINES,
+          totals: TOTALS,
+          validUntil: { anyOf: [{ bsonType: "null" }, DATE_TEXT] },
+          version: { ...WHOLE_NUMBER, minimum: 1 },
+        },
+        // A quote the client can see has its number and the date it is valid until.
+        anyOf: [
+          { properties: { status: { enum: ["draft", "withdrawn"] } } },
+          {
+            required: ["number", "validUntil"],
+            properties: { number: { bsonType: "string" }, validUntil: DATE_TEXT },
+          },
+        ],
+      });
+      await withValidator(db, "invoices", {
+        bsonType: "object",
+        required: [
+          "publicId",
+          "kind",
+          "status",
+          "currency",
+          "lines",
+          "totals",
+          "paidMinor",
+          "methods",
+          "version",
+        ],
+        properties: {
+          publicId: PUBLIC_ID,
+          kind: { enum: ["invoice", "credit"] },
+          status: { enum: ["draft", "issued", "paid", "void"] },
+          number: { bsonType: ["string", "null"], pattern: "^(INV|CN)-\\d{4}-\\d{4,}$" },
+          currency: CURRENCY,
+          lines: LINES,
+          totals: TOTALS,
+          paidMinor: AMOUNT,
+          creditedMinor: AMOUNT,
+          methods: { bsonType: "array", items: { enum: ["bank", "crypto", "card"] } },
+          version: { ...WHOLE_NUMBER, minimum: 1 },
+        },
+        // Issued, paid or void: numbered, dated and with the seller's details as they were.
+        anyOf: [
+          { properties: { status: { enum: ["draft"] } } },
+          {
+            required: ["number", "issueDate", "seller", "label"],
+            properties: {
+              number: { bsonType: "string" },
+              issueDate: DATE_TEXT,
+              seller: { bsonType: "object" },
+            },
+          },
+        ],
+      });
+      await withValidator(db, "payments", {
+        bsonType: "object",
+        required: ["invoiceId", "method", "status", "amountMinor", "currency"],
+        properties: {
+          invoiceId: { bsonType: "objectId" },
+          method: { enum: ["bank", "crypto", "card"] },
+          status: { enum: ["pending", "confirmed", "review", "failed", "refunded"] },
+          amountMinor: AMOUNT,
+          currency: CURRENCY,
+        },
+      });
+
+      const quotes = db.collection("quotes");
+      await quotes.createIndex({ publicId: 1 }, { unique: true });
+      await quotes.createIndex(
+        { number: 1 },
+        { unique: true, partialFilterExpression: { number: { $type: "string" } } },
+      );
+      await quotes.createIndex({ status: 1, updatedAt: -1 });
+      await quotes.createIndex({ clientId: 1, updatedAt: -1 });
+
+      const invoices = db.collection("invoices");
+      await invoices.createIndex({ publicId: 1 }, { unique: true });
+      await invoices.createIndex(
+        { number: 1 },
+        { unique: true, partialFilterExpression: { number: { $type: "string" } } },
+      );
+      await invoices.createIndex({ status: 1, dueDate: 1 });
+      await invoices.createIndex({ clientId: 1, createdAt: -1 });
+      await invoices.createIndex({ projectId: 1, createdAt: -1 });
+      await invoices.createIndex({ quoteId: 1 });
+
+      const payments = db.collection("payments");
+      await payments.createIndex({ invoiceId: 1, createdAt: -1 });
+      await payments.createIndex({ status: 1, createdAt: -1 });
+      // One record per payment made at a provider, and one open crypto checkout per invoice.
+      await payments.createIndex(
+        { "provider.paymentId": 1 },
+        { unique: true, partialFilterExpression: { "provider.paymentId": { $type: "string" } } },
+      );
+      await payments.createIndex(
+        { invoiceId: 1 },
+        {
+          unique: true,
+          name: "one_open_crypto_checkout",
+          partialFilterExpression: { method: "crypto", status: "pending" },
+        },
+      );
+
+      // The payment providers' callbacks, stored before they are acted on (duplicates share an _id).
+      const events = db.collection("payment_events");
+      await events.createIndex({ receivedAt: -1 });
+      await events.createIndex({ purgeAt: 1 }, { expireAfterSeconds: 0 });
+    },
+  },
+  {
+    id: "0008",
+    name: "finance",
+    async up(db) {
+      await withValidator(db, "expenses", {
+        bsonType: "object",
+        required: ["date", "amountMinor", "currency", "category", "vendor", "version"],
+        properties: {
+          date: DATE_TEXT,
+          amountMinor: { ...AMOUNT, minimum: 1 },
+          currency: CURRENCY,
+          category: {
+            enum: [
+              "software",
+              "hosting",
+              "hardware",
+              "ai",
+              "fees",
+              "contractors",
+              "education",
+              "marketing",
+              "office",
+              "taxes",
+              "other",
+            ],
+          },
+          vendor: { bsonType: "string", minLength: 1, maxLength: 200 },
+          version: { ...WHOLE_NUMBER, minimum: 1 },
+        },
+      });
+      await withValidator(db, "recurring_invoices", {
+        bsonType: "object",
+        required: ["currency", "lines", "totals", "methods", "interval", "anchorDay", "active", "version"],
+        properties: {
+          currency: CURRENCY,
+          lines: LINES,
+          totals: TOTALS,
+          interval: { enum: ["month", "quarter", "year"] },
+          anchorDay: { ...WHOLE_NUMBER, minimum: 1, maximum: 31 },
+          nextOn: { anyOf: [{ bsonType: "null" }, DATE_TEXT] },
+          endOn: { anyOf: [{ bsonType: "null" }, DATE_TEXT] },
+          active: { bsonType: "bool" },
+          version: { ...WHOLE_NUMBER, minimum: 1 },
+        },
+      });
+
+      const expenses = db.collection("expenses");
+      await expenses.createIndex({ date: -1 });
+      await expenses.createIndex({ category: 1, date: -1 });
+      await expenses.createIndex({ projectId: 1, date: -1 });
+
+      const plans = db.collection("recurring_invoices");
+      await plans.createIndex({ active: 1, nextOn: 1 });
+      // A plan bills each of its dates once.
+      await db
+        .collection("invoices")
+        .createIndex(
+          { recurringId: 1, period: 1 },
+          { unique: true, partialFilterExpression: { recurringId: { $type: "objectId" } } },
+        );
+
+      // The finance report reads payments by the day they arrived or were refunded.
+      const payments = db.collection("payments");
+      await payments.createIndex({ status: 1, confirmedAt: 1 });
+      await payments.createIndex({ status: 1, receivedOn: 1 });
+      await payments.createIndex({ refundedAt: 1 }, { partialFilterExpression: { status: "refunded" } });
     },
   },
 ];

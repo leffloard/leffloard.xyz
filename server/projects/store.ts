@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { ObjectId, type Db, type Document, type Filter } from "mongodb";
+import { ObjectId, type ClientSession, type Db, type Document, type Filter } from "mongodb";
 import type { Currency, Money } from "@/lib/money";
 import { containsPattern } from "@/lib/search";
 import {
@@ -47,10 +47,14 @@ export const MAX_MILESTONES = 30;
 export const MAX_LINKS = 20;
 
 // "PRJ-001", "PRJ-042", "PRJ-1234": one sequence for all projects.
-export async function nextProjectRef(db: Db): Promise<string> {
+export async function nextProjectRef(db: Db, session?: ClientSession): Promise<string> {
   const counter = await db
     .collection<{ _id: string; seq: number }>("counters")
-    .findOneAndUpdate({ _id: "project" }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: "after" });
+    .findOneAndUpdate(
+      { _id: "project" },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: "after", session },
+    );
   return `PRJ-${String(counter?.seq ?? 1).padStart(3, "0")}`;
 }
 
@@ -61,22 +65,28 @@ function stageScope(stage: ProjectStage): Filter<ProjectDoc> {
 export async function createProject(
   db: Db,
   input: ProjectInput,
-  options: { stage?: ProjectStage; inquiryId?: ObjectId | null } = {},
+  options: {
+    stage?: ProjectStage;
+    inquiryId?: ObjectId | null;
+    milestones?: ProjectDoc["milestones"];
+    session?: ClientSession; // inside a larger transaction (an accepted quote)
+  } = {},
   at: Date = now(),
 ): Promise<ProjectDoc | null> {
-  const client = await clients(db).findOne({ _id: input.clientId }, { projection: { _id: 1 } });
+  const { session } = options;
+  const client = await clients(db).findOne({ _id: input.clientId }, { projection: { _id: 1 }, session });
   if (!client) return null;
   const stage = options.stage ?? "planned";
   const doc: ProjectDoc = {
     _id: new ObjectId(),
-    ref: await nextProjectRef(db),
+    ref: await nextProjectRef(db, session),
     ...input,
     stage,
     // New projects go to the top of their column.
     rank: await rankFor(projects(db), stageScope(stage), null, null),
     revisionsUsed: 0,
     revisionSeq: 0,
-    milestones: [],
+    milestones: options.milestones ?? [],
     links: [],
     inquiryId: options.inquiryId ?? null,
     createdAt: at,
@@ -85,9 +95,9 @@ export async function createProject(
     deliveredAt: stage === "delivered" ? at : null,
     version: 1,
   };
-  await projects(db).insertOne(doc);
-  await markActive(db, input.clientId, at);
-  await touchClient(db, input.clientId, at);
+  await projects(db).insertOne(doc, { session });
+  await markActive(db, input.clientId, at, session);
+  await touchClient(db, input.clientId, at, undefined, session);
   return doc;
 }
 

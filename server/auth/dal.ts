@@ -55,3 +55,10 @@ export async function requireAdmin(): Promise<AdminContext> {
 export async function requireAccess(): Promise<void> {
   if (!(await accessAllowed())) forbidden();
 }
+
+// Whether the browser carries an admin session cookie, checked without Access or the database. Only for a
+// courtesy on public pages (the owner's own look at a client's quote is not the client's first view); never
+// for access to anything.
+export async function ownerCookiePresent(): Promise<boolean> {
+  return (await cookies()).has(cookieName("session"));
+}

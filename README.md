@@ -105,6 +105,39 @@ v1 data is only read, never changed.
   calendars → From URL), Apple Calendar or Outlook. It shows meetings, blocks and deadlines. Make a new
   address if the old one leaks.
 
+### Quotes, invoices and getting paid
+
+- **First, Billing → Settings**: your business details (they print on every quote and invoice), payment
+  terms, and your bank accounts (IBANs are checked; changing them asks you to confirm it's you, and you get an
+  email about it). Until you issue official e-Arşiv invoices, documents are titled *Payment request*.
+- **Quotes**: **Write a quote** on an inbox message or **New quote** on a client. Pick lines from your
+  services or type them, add a discount or taxes, choose how it's paid (all upfront, 50/50 or 40/30/30), then
+  **Send**. The client gets a link where they read it, download the PDF and accept or decline it. Accepting
+  creates the project with its payment milestones and emails the first invoice.
+- **Invoices**: **New invoice** (or from a project). A draft can change; **Issue** gives it its number and
+  emails it, and from then on it's fixed: void it (only if nothing is paid) or make a credit note. The
+  client's link shows only the ways to pay you allowed on that invoice.
+- **Payments**: a bank transfer that arrived is recorded on the invoice with **Record a bank transfer** (the
+  client gets a receipt). Crypto payments (NOWPayments) confirm themselves: the invoice turns paid and you
+  get an email. Anything unusual (a part payment, the wrong amount) waits in **Billing → Payments** for you
+  to count what arrived or mark it failed.
+- **Recurring invoices** (care plans, hosting): **Billing → Recurring → New plan**. Write `{period}` where the
+  month should go, like *Care plan: {period}*; each invoice is issued on its date and emailed.
+- **Reminders**: clients get a friendly reminder a day, a week and two weeks after an invoice is due. Stop
+  them on the invoice's page if a client has promised to pay.
+- **Crypto set-up**: create a NOWPayments account (try their sandbox first), then set `NOWPAYMENTS_API_KEY`
+  and `NOWPAYMENTS_IPN_SECRET` (Settings → Payments → IPN in NOWPayments). Ask an accountant about crypto
+  income before going live.
+
+### Finance
+
+- **Finance → Overview**: income, expenses and profit month by month, who paid most, what you spend on, and
+  what clients owe you by how late it is, all in lira (or the base currency in Billing → Settings) at TCMB's
+  rate of each day. Rates are fetched twice a day; **Exchange rates** shows them.
+- **Expenses**: add what you pay for hosting, software, fees or hardware, with the receipt's number.
+- **Export**: a CSV for your accountant with every payment, refund and expense, in a form Excel opens on a
+  Turkish Windows.
+
 ### Useful commands
 
 | Command | What it does |

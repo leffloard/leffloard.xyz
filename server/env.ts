@@ -212,6 +212,28 @@ const schema = z.object({
       )
       .optional(),
   ),
+  // Crypto payments through NOWPayments: the API key, the secret its payment callbacks (IPN) are signed with,
+  // and the API's address (https://api-sandbox.nowpayments.io/v1 to try it out; the tests use a local mock).
+  NOWPAYMENTS_API_KEY: optionalText(),
+  NOWPAYMENTS_IPN_SECRET: optionalText(),
+  NOWPAYMENTS_API_URL: optionalText()
+    .transform((value) => (value ?? "https://api.nowpayments.io/v1").replace(/\/+$/, ""))
+    .pipe(
+      z.url({
+        protocol: /^https?$/,
+        error:
+          "NOWPAYMENTS_API_URL must be an http(s) address, such as https://api-sandbox.nowpayments.io/v1.",
+      }),
+    ),
+  // Where TCMB's exchange rate bulletins are read from: today.xml and the day-by-day archive beside it.
+  TCMB_RATES_URL: optionalText()
+    .transform((value) => (value ?? "https://www.tcmb.gov.tr/kurlar").replace(/\/+$/, ""))
+    .pipe(
+      z.url({
+        protocol: /^https?$/,
+        error: "TCMB_RATES_URL must be an http(s) address, such as https://www.tcmb.gov.tr/kurlar.",
+      }),
+    ),
   // "off" for a second copy of the app (the deploy script's trial start): it serves pages but runs no jobs.
   BACKGROUND_JOBS: optionalText()
     .transform((value) => value?.toLowerCase() ?? "on")
@@ -223,6 +245,12 @@ const checkedSchema = schema.superRefine((env, ctx) => {
     ctx.addIssue({
       code: "custom",
       message: "Set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY, or neither.",
+    });
+  }
+  if (Boolean(env.NOWPAYMENTS_API_KEY) !== Boolean(env.NOWPAYMENTS_IPN_SECRET)) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Set both NOWPAYMENTS_API_KEY and NOWPAYMENTS_IPN_SECRET, or neither.",
     });
   }
   if (Boolean(env.CF_ACCESS_TEAM_DOMAIN) !== Boolean(env.CF_ACCESS_AUD)) {
@@ -259,6 +287,9 @@ function productionWarnings(env: z.infer<typeof schema>): string[] {
     warnings.push("TURNSTILE_* is not set: sign-in and forms have no bot check.");
   if (!env.CF_ACCESS_TEAM_DOMAIN)
     warnings.push("CF_ACCESS_* is not set: /admin is protected by the sign-in only.");
+  if (env.NOWPAYMENTS_API_KEY && env.NOWPAYMENTS_API_URL.includes("sandbox")) {
+    warnings.push("NOWPAYMENTS_API_URL is the sandbox: crypto payments are test payments.");
+  }
   if (env.CLIENT_IP_SOURCE === "socket") {
     warnings.push("CLIENT_IP_SOURCE is socket: behind the Cloudflare Tunnel set it to cloudflare.");
   }

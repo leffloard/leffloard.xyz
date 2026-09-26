@@ -29,6 +29,11 @@ const LABELS: Record<string, string> = {
   "clients.client.exported": "Client data exported",
   "clients.client.deleted": "Client deleted",
   "projects.project.deleted": "Project deleted",
+  "billing.bank.changed": "Bank details changed",
+  "billing.invoice.voided": "Invoice voided",
+  "billing.payment.recorded": "Payment recorded by hand",
+  "billing.payment.refunded": "Refund recorded",
+  "finance.exported": "Finance CSV exported",
 };
 
 const WARNINGS = new Set([
@@ -38,6 +43,8 @@ const WARNINGS = new Set([
   "auth.passkey.failed",
   "auth.sudo.failed",
   "auth.access.denied",
+  // Where clients send money: worth noticing every time.
+  "billing.bank.changed",
 ]);
 
 export function auditLabel(action: string): string {

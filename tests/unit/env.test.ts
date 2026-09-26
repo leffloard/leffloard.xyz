@@ -40,9 +40,28 @@ describe("readEnv", () => {
         BACKUP_KEY: undefined,
         BACKUP_DIR: undefined,
         BACKUP_KEEP: undefined,
+        NOWPAYMENTS_API_KEY: undefined,
+        NOWPAYMENTS_IPN_SECRET: undefined,
+        NOWPAYMENTS_API_URL: "https://api.nowpayments.io/v1",
+        TCMB_RATES_URL: "https://www.tcmb.gov.tr/kurlar",
         BACKGROUND_JOBS: "on",
       },
     });
+  });
+
+  it("wants both NOWPayments keys or neither", () => {
+    const report = readEnv({ ...VALID, NOWPAYMENTS_API_KEY: "key" });
+    expect(report.ok).toBe(false);
+    expect(!report.ok && report.problems).toContain(
+      "Set both NOWPAYMENTS_API_KEY and NOWPAYMENTS_IPN_SECRET, or neither.",
+    );
+    const both = readEnv({
+      ...VALID,
+      NOWPAYMENTS_API_KEY: "key",
+      NOWPAYMENTS_IPN_SECRET: "secret",
+      NOWPAYMENTS_API_URL: "https://api-sandbox.nowpayments.io/v1/",
+    });
+    expect(both.ok && both.env.NOWPAYMENTS_API_URL).toBe("https://api-sandbox.nowpayments.io/v1");
   });
 
   it("accepts a local replica set address and trims spaces", () => {

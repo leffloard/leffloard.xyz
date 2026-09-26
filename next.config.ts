@@ -29,6 +29,15 @@ const nextConfig: NextConfig = {
   },
   // Packages that load files at runtime (fonts, grammars) stay outside the server bundle.
   serverExternalPackages: ["@react-pdf/renderer", "shiki", "@shikijs/rehype"],
+  // Quote and invoice PDFs are made on request and read these font files by path, which the standalone
+  // output would otherwise leave behind.
+  outputFileTracingIncludes: {
+    "/**": [
+      "./node_modules/geist/dist/fonts/geist-sans/Geist-Regular.ttf",
+      "./node_modules/geist/dist/fonts/geist-sans/Geist-Medium.ttf",
+      "./node_modules/geist/dist/fonts/geist-sans/Geist-SemiBold.ttf",
+    ],
+  },
   async redirects() {
     return [
       // v1 addresses: the request form opened with ?type=..., and four template blog posts. An

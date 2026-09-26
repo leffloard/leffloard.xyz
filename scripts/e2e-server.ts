@@ -15,10 +15,15 @@ import {
   E2E_DB_NAME,
   E2E_ENCRYPTION_KEYS,
   E2E_HEALTH_TOKEN,
+  E2E_MOCK_PORT,
+  E2E_MOCK_URL,
   E2E_MONGO_URL_FILE,
+  E2E_NOWPAYMENTS,
   E2E_PORT,
+  E2E_RATES,
   OWNER,
 } from "@/tests/e2e/fixtures";
+import { startMocks } from "./lib/e2e-mocks";
 import { assembleStandalone, STANDALONE_SERVER } from "./lib/standalone";
 
 async function main(): Promise<void> {
@@ -45,6 +50,12 @@ async function main(): Promise<void> {
   mkdirSync(path.dirname(E2E_MONGO_URL_FILE), { recursive: true });
   rmSync(E2E_BACKUP_DIR, { recursive: true, force: true });
   writeFileSync(E2E_MONGO_URL_FILE, mongoUrl);
+  const mocks = await startMocks({
+    port: E2E_MOCK_PORT,
+    apiKey: E2E_NOWPAYMENTS.apiKey,
+    ipnSecret: E2E_NOWPAYMENTS.ipnSecret,
+    rates: E2E_RATES,
+  });
 
   const server = spawn(process.execPath, [STANDALONE_SERVER], {
     stdio: "inherit",
@@ -64,6 +75,11 @@ async function main(): Promise<void> {
       NOTIFY_EMAIL_TO: OWNER.email,
       BACKUP_KEY: E2E_BACKUP_KEY,
       BACKUP_DIR: E2E_BACKUP_DIR,
+      // Crypto payments and exchange rates from the local mocks.
+      NOWPAYMENTS_API_KEY: E2E_NOWPAYMENTS.apiKey,
+      NOWPAYMENTS_IPN_SECRET: E2E_NOWPAYMENTS.ipnSecret,
+      NOWPAYMENTS_API_URL: `${E2E_MOCK_URL}/v1`,
+      TCMB_RATES_URL: `${E2E_MOCK_URL}/kurlar`,
       LOG_LEVEL: process.env.LOG_LEVEL ?? "warn",
     },
   });
@@ -73,6 +89,7 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     server.kill();
+    mocks.close();
     await replSet.stop();
     process.exit(code);
   };

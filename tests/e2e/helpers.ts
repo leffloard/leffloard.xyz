@@ -91,7 +91,11 @@ export async function axeViolations(page: Page): Promise<string[]> {
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
+  // The rule, where, and why (for a contrast failure: the colours and the ratio).
   return result.violations.map(
-    (violation) => `${violation.id}: ${violation.nodes.map((node) => node.target).join(" ")}`,
+    (violation) =>
+      `${violation.id}: ${violation.nodes
+        .map((node) => `${node.target.join(" ")} (${node.any[0]?.message ?? node.failureSummary ?? ""})`)
+        .join(", ")}`,
   );
 }

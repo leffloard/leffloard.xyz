@@ -50,7 +50,19 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
 - Form rules live in `lib/intake/` and run in both the browser and the server; the v1 API's messages and
   status codes stay exactly as `tests/legacy-parity.md` describes.
 - Money is `{ amountMinor, currency }` (whole minor units); parse, format and calculate it only with
-  `lib/money.ts`. Calendar dates are `YYYY-MM-DD` strings in the owner's time zone; instants are `Date`s.
+  `lib/money.ts` (and `lib/billing/document.ts` for lines, discounts, taxes and schedules, `lib/finance/fx.ts`
+  for conversions). Never multiply or divide an amount with floats, never add amounts in different
+  currencies, and never convert without a stored TCMB rate. Calendar dates are `YYYY-MM-DD` strings in the
+  owner's time zone; instants are `Date`s.
+- Billing documents change only through `server/billing`: an issued quote or invoice is frozen (void, credit
+  note or a new version instead), numbers come from `nextDocumentNumber()` inside the issuing transaction,
+  and a payment and its invoice's paid amount change in one transaction. Payment states only move forward.
+- A payment provider's callback is never trusted for money: check its signature, store it first
+  (`payment_events`), then act only on the status read back from the provider's API and matched against our
+  checkout. Anything unexpected goes to the review queue, never straight onto an invoice.
+- Public quote and invoice links (`/q/`, `/i/`, `/pay/`) are secrets: 128-bit `publicId`s, noindex, no
+  referrer, nonce CSP. Public pages must not call `currentAdmin()` (it audits denials); use
+  `ownerCookiePresent()`.
 - Admin form fields are parsed with the zod helpers in `lib/forms.ts` (they clean text like the contact form
   does). Ordered lists store a rank from `lib/rank.ts`, placed with `rankFor()` in `server/db/ordering.ts`.
 - Meetings are created, moved and ended only through `server/calendar/meetings.ts`, which writes the

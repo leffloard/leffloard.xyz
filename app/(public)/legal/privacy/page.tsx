@@ -38,6 +38,15 @@ export default function PrivacyPage() {
           quotes, invoices and payments.
         </li>
         <li>
+          <strong>Quotes and invoices</strong>: the name, company, email and address they are made out to,
+          what they are for, and whether and when their link was opened.
+        </li>
+        <li>
+          <strong>Payments</strong>: for a bank transfer, the amount, the day it arrived and its reference
+          (which may show the sender&apos;s name); for cryptocurrency, NOWPayments&apos; payment number, the
+          coin and the amount paid. I never see card details, wallet keys or bank logins.
+        </li>
+        <li>
           <strong>Technical data</strong> needed to run the site securely: IP address, browser type and the
           time of a request, used for rate limits, abuse prevention and security logs.
         </li>
@@ -54,7 +63,8 @@ export default function PrivacyPage() {
           or the contract itself, at your request.
         </li>
         <li>
-          To deliver and invoice a project: performance of a contract, and legal obligations for accounting.
+          To deliver and invoice a project, confirm payments and remind you of an unpaid invoice: performance
+          of a contract, and legal obligations for accounting.
         </li>
         <li>To keep the site secure: my legitimate interest in preventing abuse.</li>
       </ul>
@@ -75,14 +85,19 @@ export default function PrivacyPage() {
           a message whose sender ticked &ldquo;Don&apos;t use AI tools on my message&rdquo;.
         </li>
         <li>Cloudflare: network, security and bot checks (Turnstile) for the site.</li>
-        <li>NOWPayments: only if you choose to pay with cryptocurrency.</li>
+        <li>
+          NOWPayments: only if you choose to pay with cryptocurrency. It receives the invoice&apos;s number,
+          description and amount, and you pay on its page, under its own privacy policy.
+        </li>
       </ul>
       <h2>How long I keep it</h2>
       <p>
         Inquiries that do not become a project are deleted after 24 months without contact, and messages
         marked as spam after 30 days. Call bookings are deleted 24 months after the call. Copies of the emails
-        the site sends are kept for 30 days to check they arrived. Client records and invoices are kept for as
-        long as Turkish tax and commercial law requires. Security logs are kept for up to 12 months.
+        the site sends are kept for 30 days to check they arrived. Client records, quotes, invoices and
+        payments are kept for as long as Turkish tax and commercial law requires (up to 10 years). The payment
+        provider&apos;s notifications about a payment are kept for about 13 months. Security logs are kept for
+        up to 12 months.
       </p>
       <h2>Your rights</h2>
       <p>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/components/ui/cn";
 
-export type NavCounts = { inbox: number; tasks: number; calendar: number };
+export type NavCounts = { inbox: number; tasks: number; calendar: number; billing: number };
 
 type Item = { href: string; label: string; icon: string; count?: { key: keyof NavCounts; label: string } };
 
@@ -38,6 +38,17 @@ const ITEMS: Item[] = [
     label: "Clients",
     icon: "M7.5 9a2.8 2.8 0 100-5.6 2.8 2.8 0 000 5.6zM2.5 16.5c0-2.8 2.2-5 5-5s5 2.2 5 5M13 3.6a2.7 2.7 0 010 5.2M14.6 11.8c1.7.6 2.9 2.4 2.9 4.7",
   },
+  {
+    href: "/admin/billing",
+    label: "Billing",
+    icon: "M5 3.5h10v13l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3zM7.5 7.5h5M7.5 10.5h5",
+    count: { key: "billing", label: " overdue or to review" },
+  },
+  {
+    href: "/admin/finance",
+    label: "Finance",
+    icon: "M3.5 16.5h13M5.5 13.5v-4M9 13.5v-7M12.5 13.5V9.5M16 13.5v-9",
+  },
   { href: "/admin/time", label: "Time", icon: "M10 17a7 7 0 100-14 7 7 0 000 14zM10 6.5V10l2.5 1.8" },
   {
     href: "/admin/security",
@@ -51,7 +62,7 @@ const ITEMS: Item[] = [
   },
 ];
 
-const NO_COUNTS: NavCounts = { inbox: 0, tasks: 0, calendar: 0 };
+const NO_COUNTS: NavCounts = { inbox: 0, tasks: 0, calendar: 0, billing: 0 };
 
 export function AdminNav({ counts = NO_COUNTS }: { counts?: NavCounts }) {
   const pathname = usePathname();

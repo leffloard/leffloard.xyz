@@ -194,7 +194,7 @@ export function BookingFlow({
           <div className="mt-8 flex flex-wrap gap-3">
             <a
               href={`${done.manageUrl}/invite.ics`}
-              className="inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm font-medium text-accent-ink hover:bg-accent/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm font-medium text-accent-ink hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               Add to calendar
             </a>
@@ -354,7 +354,7 @@ export function BookingFlow({
             <div>
               <button
                 type="submit"
-                className="inline-flex h-12 items-center rounded-full bg-accent px-6 text-sm font-medium text-accent-ink hover:bg-accent/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
+                className="inline-flex h-12 items-center rounded-full bg-accent px-6 text-sm font-medium text-accent-ink hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
               >
                 {sending ? "Booking…" : type.requiresApproval ? "Request this time" : "Book this time"}
               </button>

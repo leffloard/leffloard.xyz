@@ -19,7 +19,13 @@ export type OutboxItem =
 export type OutboxStatus = "pending" | "sending" | "sent" | "failed" | "skipped";
 
 // What a message is about: an inbox message (and the reply it carries), or a meeting.
-export type OutboxRef = { inquiryId?: ObjectId; replyId?: string; meetingId?: ObjectId };
+export type OutboxRef = {
+  inquiryId?: ObjectId;
+  replyId?: string;
+  meetingId?: ObjectId;
+  quoteId?: ObjectId;
+  invoiceId?: ObjectId;
+};
 
 export type OutboxDoc = OutboxItem & {
   _id: ObjectId;

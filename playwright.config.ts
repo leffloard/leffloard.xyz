@@ -21,7 +21,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /(admin-(inbox|settings|work)|calendar)\.spec\.ts/,
+      testIgnore: /(admin-(inbox|settings|work)|calendar|billing)\.spec\.ts/,
       use: chromium,
     },
     {
@@ -44,6 +44,13 @@ export default defineConfig({
       name: "calendar",
       testMatch: /calendar\.spec\.ts/,
       dependencies: ["admin-work"],
+      use: chromium,
+    },
+    {
+      // Quotes, invoices and payments: after the calendar, one step after another.
+      name: "billing",
+      testMatch: /billing\.spec\.ts/,
+      dependencies: ["calendar"],
       use: chromium,
     },
   ],

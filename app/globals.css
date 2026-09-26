@@ -41,6 +41,12 @@ body {
 
 /* --- Public site ---------------------------------------------------------------------------------------- */
 
+/* An accent button under the pointer: mixed towards the text colour, so it gets lighter on the dark theme and
+   darker on the light one, and its label keeps its contrast either way (fading it would lower it). */
+@utility bg-accent-hover {
+  background-color: color-mix(in oklch, var(--color-accent) 85%, var(--color-ink));
+}
+
 /* The public site follows the system theme; the admin stays dark for now. */
 .site-theme {
   color-scheme: light dark;

@@ -1,5 +1,5 @@
 import "server-only";
-import { ObjectId, type Db, type Document, type Filter } from "mongodb";
+import { ObjectId, type ClientSession, type Db, type Document, type Filter } from "mongodb";
 import type { InquiryKind } from "@/lib/intake/options";
 import { DEFAULT_CURRENCY, type Currency } from "@/lib/money";
 import { containsPattern, equalsIgnoringCase } from "@/lib/search";
@@ -105,17 +105,30 @@ export async function setClientStatus(
 }
 
 // Marks a client as being worked for, when a project starts. Archived clients keep their status.
-export async function markActive(db: Db, id: ObjectId, at: Date = now()): Promise<void> {
+export async function markActive(
+  db: Db,
+  id: ObjectId,
+  at: Date = now(),
+  session?: ClientSession,
+): Promise<void> {
   await clients(db).updateOne(
     { _id: id, status: { $in: ["lead", "past"] } },
     { $set: { status: "active", updatedAt: at }, $inc: { version: 1 } },
+    { session },
   );
 }
 
-export async function touchClient(db: Db, id: ObjectId, at: Date = now(), contactAt?: Date): Promise<void> {
+export async function touchClient(
+  db: Db,
+  id: ObjectId,
+  at: Date = now(),
+  contactAt?: Date,
+  session?: ClientSession,
+): Promise<void> {
   await clients(db).updateOne(
     { _id: id },
     contactAt ? { $set: { updatedAt: at }, $max: { lastContactAt: contactAt } } : { $set: { updatedAt: at } },
+    { session },
   );
 }
 

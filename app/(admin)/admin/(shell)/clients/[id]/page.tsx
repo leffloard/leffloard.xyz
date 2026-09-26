@@ -197,6 +197,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             <Link href={`/admin/calendar/new?client=${hexId}`} className={buttonClasses("secondary", "sm")}>
               New meeting
             </Link>
+            <Link
+              href={`/admin/billing/quotes/new?client=${hexId}`}
+              className={buttonClasses("secondary", "sm")}
+            >
+              New quote
+            </Link>
             <Link href={`/admin/projects/new?client=${hexId}`} className={buttonClasses("primary", "sm")}>
               New project
             </Link>

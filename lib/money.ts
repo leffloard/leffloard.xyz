@@ -49,6 +49,27 @@ export function parseAmount(text: string): ParsedAmount {
   return { ok: true, minor };
 }
 
+// An amount as a plain decimal with its cents, for other systems' APIs: "925.00", "-12.50".
+export function decimalAmount(amountMinor: number): string {
+  if (!Number.isSafeInteger(amountMinor)) throw new RangeError("Money amounts are whole minor units.");
+  const sign = amountMinor < 0 ? "-" : "";
+  const minor = Math.abs(amountMinor);
+  return `${sign}${Math.trunc(minor / MINOR_PER_MAJOR)}.${String(minor % MINOR_PER_MAJOR).padStart(2, "0")}`;
+}
+
+// A plain decimal from another system ("925", "925.3", 925.3) in minor units, exactly. Null for anything
+// else: a negative or malformed amount, or one with fractions of a cent.
+export function parseDecimalAmount(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const text = typeof value === "number" ? (Number.isFinite(value) ? String(value) : "") : value.trim();
+  const match = /^(\d{1,13})(?:\.(\d{1,20}))?$/.exec(text);
+  if (!match) return null;
+  const fraction = match[2] ?? "";
+  if (/[1-9]/.test(fraction.slice(2))) return null;
+  const minor = Number(match[1]) * MINOR_PER_MAJOR + Number(fraction.slice(0, 2).padEnd(2, "0"));
+  return Number.isSafeInteger(minor) && minor <= MAX_AMOUNT_MINOR ? minor : null;
+}
+
 // The value a form field starts with: "1250" or "1250.50".
 export function amountInput(value: Money | null | undefined): string {
   if (!value) return "";
@@ -86,6 +107,39 @@ export function formatMoney(value: Money): string {
 // Half away from zero, the way people round money by hand.
 function roundHalfAway(value: number): number {
   return Math.sign(value) * Math.round(Math.abs(value));
+}
+
+// amountMinor × numerator ÷ denominator, rounded half away from zero, computed exactly (a quantity of 1.5
+// is 1500/1000, 20% is 2000/10000). Large amounts times large factors would lose precision as floats.
+export function scaleMinor(amountMinor: number, numerator: number, denominator: number): number {
+  if (![amountMinor, numerator, denominator].every(Number.isSafeInteger) || denominator <= 0) {
+    throw new RangeError("scaleMinor takes whole numbers and a positive denominator.");
+  }
+  const product = BigInt(amountMinor) * BigInt(numerator);
+  const divisor = BigInt(denominator);
+  const negative = product < 0n;
+  const magnitude = negative ? -product : product;
+  let quotient = magnitude / divisor;
+  if ((magnitude % divisor) * 2n >= divisor) quotient += 1n;
+  const result = Number(negative ? -quotient : quotient);
+  if (!Number.isSafeInteger(result) || Math.abs(result) > MAX_AMOUNT_MINOR) {
+    throw new RangeError("That amount is too large.");
+  }
+  return result;
+}
+
+const plainFormatters = new Map<Currency, Intl.NumberFormat>();
+
+// "USD 1,250.00", "TRY 12,000.00": always with cents and the currency's code, for documents (invoices and
+// quotes are read by accountants, and a PDF font may lack a currency sign).
+export function formatMoneyCode(value: Money): string {
+  let format = plainFormatters.get(value.currency);
+  if (!format) {
+    format = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    plainFormatters.set(value.currency, format);
+  }
+  const sign = value.amountMinor < 0 ? "-" : "";
+  return `${sign}${value.currency} ${format.format(Math.abs(value.amountMinor) / MINOR_PER_MAJOR)}`;
 }
 
 // What a stretch of time is worth at an hourly rate.

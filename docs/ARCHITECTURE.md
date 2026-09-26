@@ -5,8 +5,8 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M6, the calendar: booking calls, meetings, blocks,
-the owner's hours and a private calendar feed**.
+This document grows with each milestone. Current state: **M7, money: quotes, invoices, payments (bank
+transfer and NOWPayments crypto), recurring invoices, expenses and the finance reports**.
 
 ## Layout
 
@@ -15,15 +15,22 @@ app/                      Routes (App Router)
   (public)/               Public site, with its own root layout: home, work, services, pricing, about, cv,
                           blog, contact, book, legal pages, colophon; OG images, cv.pdf and the RSS feed
     meeting/[token]/      A guest's own page for their meeting (reschedule, cancel, invite.ics)
+    q/[publicId]/         A quote's link: read it, accept or decline it, its PDF
+    i/[publicId]/         An invoice's link: how to pay (bank details, crypto), its PDF
+    pay/return/           Where NOWPayments sends the client back after paying
   sitemap.ts, robots.ts   Machine-readable files (plus manifest.ts and .well-known/security.txt)
   (admin)/admin/          Admin, with its own root layout (dynamic, noindex)
     login/, setup/        Sign-in, two-step check, first-time authenticator setup
-    (shell)/              Signed-in pages: Today, Inbox, Calendar, Tasks, Projects, Clients, Time, Security,
-                          Settings
+    (shell)/              Signed-in pages: Today, Inbox, Calendar, Tasks, Projects, Clients, Billing (quotes,
+                          invoices, recurring, payments, settings), Finance (overview, expenses, rates,
+                          export), Time, Security, Settings
   api/inquiries/route.ts  The contact form's endpoint
   api/bookings/           Booking a call, and the open times of a booking type
   api/meetings/[token]/   The guest's link: open times, reschedule, cancel
   api/calendar/feed/      The owner's private calendar feed (iCalendar)
+  api/quotes/[publicId]/  The client accepts or declines a quote
+  api/invoices/[publicId]/checkout/  The client starts paying an invoice in crypto (a NOWPayments page)
+  api/payments/nowpayments/  NOWPayments' payment callbacks (IPN)
   api/requests/route.ts   The v1 form API, same contract as v1 (kept until the legacy code is removed)
   api/[[...path]]/        JSON 404 for unknown API addresses
   api/health/route.ts     Health check (shallow and deep)
@@ -38,6 +45,9 @@ lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, C
   work/                   Choices and calendar-date rules of the work modules (stages, due dates, repeats)
   booking/                The owner's hours and their rules, the slot engine, iCalendar output, the booking
                           form's rules
+  billing/                Document lines, totals, discounts, taxes and payment schedules; statuses and their
+                          words; IBAN checks; the billing forms; recurring dates and periods
+  finance/                TCMB bulletins and exact conversions, expense categories, receivables' ages, CSV
 server/                   Server-only code (every file imports "server-only")
   env.ts                  Validated configuration, plain-English errors
   boot.ts                 Runs once at start-up (via instrumentation.ts); stops on bad config
@@ -55,6 +65,11 @@ server/                   Server-only code (every file imports "server-only")
   tasks/, time/           Tasks (lists, board, checklists, repeats) and time entries (the one running timer)
   calendar/               Hours and the feed's secret, booking types, meetings and their slot locks, blocks,
                           the booking flows for guests and the owner, their emails, the feed
+  billing/                Billing settings, numbering, quotes (and their acceptance), invoices, payments, the
+                          NOWPayments client and its callbacks, recurring invoices, reminders, emails, PDFs
+  finance/                Expenses, exchange rates (fetching and storing TCMB's bulletins), the reports and
+                          the accountant's CSV
+  pdf/                    The fonts every generated PDF uses
   work/collections.ts     The work modules' collections, so their stores do not import each other
   notify/                 Notification channels, templates, escaping, the outbox, SMTP and Discord senders
   jobs/                   Background jobs inside the server process (croner), with once-per-period runs
@@ -65,7 +80,8 @@ server/                   Server-only code (every file imports "server-only")
   db/migrate.ts           Migration runner with a database lock
   db/migrations/          The ordered migration list
   db/url.ts               Connection-string redaction for messages
-scripts/                  dev-db, migrate, migrate-legacy, backup, restore, admin, start, e2e-server (tsx)
+scripts/                  dev-db, migrate, migrate-legacy, backup, restore, admin, start, e2e-server (tsx);
+                          lib/e2e-mocks.ts plays NOWPayments and TCMB in the end-to-end tests
 deploy/                   start-production.cjs (the service's launcher) and the Windows scripts: install,
                           deploy, rollback, smoke, app (see docs/DEPLOY.md)
 tests/
@@ -364,6 +380,90 @@ collections.
   idempotency key. Meetings are deleted
   24 months after they end (a TTL index); cell locks and day counters expire a day after the meeting.
 
+## Quotes, invoices and payments
+
+Money from a client (M7): a quote they accept from its link becomes a project and its first invoice; an
+invoice is paid by bank transfer or in crypto through NOWPayments. `lib/billing` holds the pure rules;
+`server/billing` is the only code that touches the billing collections.
+
+- **Amounts.** Integer minor units with their currency everywhere, and all arithmetic in `lib/money.ts` and
+  `lib/billing/document.ts`: quantities in thousandths, percentages in basis points, products and
+  percentages through `scaleMinor()` (BigInt, rounded half away from zero), a payment schedule whose
+  payments are worked out as their invoices will be (each share before tax, with the taxes on it; the last
+  takes the remainder), so the quote shows exactly what the deposit invoice asks and the steps add up. The same functions preview totals in
+  the editor and compute them on the server. The database refuses a malformed document too: quotes,
+  invoices, payments, expenses and recurring invoices have `$jsonSchema` validators.
+- **Quotes.** Written from a client (an inbox message on the way), with lines (or picked from the services
+  catalogue, prices copied), a discount, taxes, a payment schedule (all upfront, 50/50 or 40/30/30), a
+  timeline and revision rounds. A quote is numbered (`Q-2026-0001`) when first sent and valid for 14 days by
+  default. Its link (`/q/<publicId>`, 128 random bits) shows it and takes the answer; accepting is one
+  transaction that checks the quote's version, marks it accepted, creates the project with a milestone per
+  payment and issues the first invoice. A changed quote can't be accepted from an old page.
+- **Invoices** are drafts until issued. Issuing numbers them (`INV-2026-0001`, credit notes `CN-`) from a
+  counter in the same transaction, and freezes the seller's details, the document's label ("Payment request"
+  until the owner issues e-Arşiv invoices), the ways to pay and the bank account. An issued invoice never
+  changes: it is voided (only while nothing is paid or credited on it; asks to confirm it's you) or corrected
+  by a credit note, which takes its amount off what the invoice owes in the transaction that issues it (in
+  the invoice's currency, never beyond its total). An invoice covered by payments and credit notes is
+  settled; a credit note is never voided. Its link (`/i/<publicId>`) shows the amount left and only the ways to pay it offers; quotes and
+  invoices are also PDFs (`@react-pdf/renderer`, Geist, amounts with currency codes because the font has
+  no ₺). Opening a link is recorded as "viewed".
+- **Payments.** A payment and the invoice's paid amount change in one transaction, and the invoice is paid
+  once they cover it; an amount beyond what's left is refused. A bank transfer is recorded by hand (asks to
+  confirm it's you, audited, and the client gets a receipt); a refund takes it off the invoice again.
+- **Crypto (NOWPayments).** The client's click opens one checkout per invoice (a unique partial index makes
+  two clicks one), for the amount left, on NOWPayments' hosted page, reused while it's current. Its
+  callbacks (IPN) are size-limited and rate-limited, then checked: the HMAC-SHA512 signature over the
+  key-sorted JSON (the three ways NOWPayments' own libraries sort it), compared in constant time; stored
+  under a key per payment, status and time before anything else, so a repeat is recognised and one that
+  failed half way is taken again; and then only the payment's status read back from NOWPayments' API counts,
+  checked against our checkout's order, NOWPayments' invoice, amount and currency. Only `finished` credits
+  the invoice. A part payment, a mismatch, money for an invoice that was paid or voided meanwhile, or more
+  than what's left goes to the owner's review queue instead; a second payment through the same checkout gets
+  a record of its own there. States only move forward, so late or repeated callbacks change nothing. A
+  repeat that arrives while its first copy is being handled is answered 503, so NOWPayments sends it again;
+  one whose handling stopped half way (a restart) is taken again after two minutes; and a job re-reads
+  checkouts still pending from NOWPayments' API every 30 minutes, so a lost callback loses no payment.
+  Amounts to and from NOWPayments are written and read as exact decimals.
+- **Recurring invoices** (care plans, hosting) are issued every month, quarter or year on the plan's day of
+  the month (the 31st falls back to a shorter month's last day), between 09:00 and 21:00, and emailed.
+  `{period}` in the title, lines or notes becomes the months covered. The plan's next date moves on in the
+  transaction that issues the invoice, and the invoice records its plan and date under a unique index, so a
+  date is never billed twice (a date already billed is refused when a plan is saved). A plan that can't be
+  issued (no bank account for its currency) tells the owner once and tries again, without holding up the
+  others. Editing a plan keeps it paused or running and keeps its day of the month; resuming a paused plan
+  starts from its next date after today, so the paused months are not billed.
+- **Reminders.** An unpaid invoice's client is reminded a day, a week and two weeks after the due date, at
+  most one every five days, then no more; the owner can stop them per invoice. Each is claimed on the invoice
+  first, so it goes out once.
+- **A quote can only be sent if its first invoice could be paid** (a bank account in its currency, or crypto
+  set up), and it keeps the seller's details as they were when sent.
+- **The admin.** Billing's overview (owed, overdue, quotes out), lists, the editor, each document's page
+  with its actions, payments and review queue, the NOWPayments callbacks log, and the settings (business
+  details, payment terms, bank accounts with IBAN checks: changing them asks to confirm it's you, is audited
+  and announced by email).
+
+## Finance
+
+- **Exchange rates** come from TCMB's daily bulletin (forex buying rates), stored per bulletin date as whole
+  ten-thousandths of a lira. A day's amounts use the bulletin of the last business day before it (TCMB
+  announces at 15:30 for the next day, as Turkish bookkeeping does), found within ten days, and only if
+  every weekday in between is known to have had none: a bulletin missed while the server was off is fetched,
+  not replaced by an older one. The job fetches
+  `today.xml` each morning and after 15:30, and fills in older bulletins transactions need from TCMB's
+  archive (a few per run; days without one are remembered). Conversions go through the lira with
+  `scaleMinor()`, so they are exact; an amount without a rate is listed and left out of the totals in the
+  base currency (`baseCurrency` in the billing settings, TRY by default), never guessed.
+- **Expenses** have a date, amount and currency, a category, who was paid, what for, a receipt number and
+  optionally a project.
+- **The reports** (Finance → Overview): income (payments on the day they arrived, refunds on the day they
+  were made), expenses and profit before tax, month by month (a chart drawn on the server, with a table of
+  the same numbers), income by client, expenses by category, and what clients owe today by how late it is.
+- **The accountant's CSV** has every payment, refund and expense in a span of days, with signed amounts,
+  TCMB's rate and bulletin date, and the amount in the base currency; in the standard form or the one Excel
+  opens as columns on a Turkish Windows. Text a spreadsheet would run as a formula is defused. Exporting asks
+  to confirm it's you and is audited.
+
 ## Operations
 
 The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
@@ -403,8 +503,16 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
 - Every public page is checked with axe (WCAG 2.2 AA) in both themes, and for horizontal overflow at 360px;
   the admin's pages are checked with axe as the tests go through them.
 - Admin tests that share data run in order: the sign-in tests, then the inbox and settings, then the work
-  modules, then booking and the calendar (Playwright project dependencies in `playwright.config.ts`). The
-  calendar tests book as visitors in London and New York, and check the invites the emails carry.
+  modules, then booking and the calendar, then billing (Playwright project dependencies in
+  `playwright.config.ts`). The calendar tests book as visitors in London and New York, and check the invites
+  the emails carry; the billing tests go from a quote to a crypto payment, a bank transfer and its refund, a
+  care plan, an expense and the accountant's CSV.
+- The integration tests' `mongod` closes idle files and checkpoints every second: every test file rebuilds
+  its database before each test, and WiredTiger would otherwise hold thousands of files and abort at the
+  open files limit.
+- NOWPayments and TCMB are played by a local mock in the end-to-end tests (`scripts/lib/e2e-mocks.ts`): it
+  serves NOWPayments' API and payment page, sends signed callbacks when a test "pays", and serves fixed
+  bulletins. The integration tests stub `fetch` instead.
 - Offline machines can use local binaries: `MONGOMS_SYSTEM_BINARY=/path/to/mongod`,
   `PW_CHROMIUM_PATH=/path/to/chrome`.
 
@@ -448,10 +556,10 @@ Every direct dependency and why it is here.
 | `qrcode`                                                                                        | The QR code for setting up the authenticator app, rendered on the server as SVG.                                      |
 | `unified`, `remark-parse`, `remark-gfm`, `remark-rehype`, `rehype-sanitize`, `rehype-stringify` | The Markdown pipeline for blog posts, with sanitising before anything is published.                                   |
 | `shiki`, `@shikijs/rehype`                                                                      | Code highlighting at build time, in a light and a dark theme, with no JavaScript sent to the browser.                 |
-| `@react-pdf/renderer`                                                                           | Generates `/cv.pdf` from the same data as the CV page.                                                                |
+| `@react-pdf/renderer`                                                                           | Generates `/cv.pdf` from the same data as the CV page, and the quotes' and invoices' PDFs.                            |
 | `@axe-core/playwright`                                                                          | Accessibility checks (WCAG 2.2 AA) in the browser tests.                                                              |
 | `nodemailer`                                                                                    | Sends email over SMTP (STARTTLS, TLS or plain), with correct encoding of non-ASCII names and subjects.                |
-| `croner`                                                                                        | Runs the background jobs (the outbox now; backups and digests later) without overlapping runs.                        |
+| `croner`                                                                                        | Runs the background jobs (outbox, backups, reminders, rates, recurring invoices) without overlapping runs.            |
 
 ## Decisions
 
@@ -502,3 +610,18 @@ Every direct dependency and why it is here.
 21. **The guest's link is stored as a hash and a sealed copy.** The hash finds the meeting; the sealed copy
     lets reminders and change emails include the link, and a leaked meeting record or backup does not give
     away the link.
+
+22. **A document is numbered when it is issued, and never changes after.** Numbers come from a counter in the
+    issuing transaction, so there are no gaps from deleted drafts and no two documents share one; a mistake
+    on an issued invoice is corrected by a credit note, as an accountant expects.
+23. **A payment callback is a hint, not proof.** Only the status read back from NOWPayments' API with our
+    key, matching the checkout's order, amount and currency, moves money; the signed callback only says
+    when to look. Anything unusual waits for the owner instead of being guessed.
+24. **Payment states only move forward**, enforced by conditional updates, so callbacks that arrive late,
+    twice or out of order cannot undo a confirmation or credit an invoice twice.
+25. **TCMB's rates, stored, instead of a live currency API.** They are free, official, and what the
+    accountant uses; storing each bulletin makes every report and CSV reproducible, and a missing rate is
+    shown as missing.
+26. **Reminders and recurring invoices are claimed in the database before they are sent** (a conditional
+    update, a unique period per plan), like every other message, so a restart or a second process never
+    sends one twice.

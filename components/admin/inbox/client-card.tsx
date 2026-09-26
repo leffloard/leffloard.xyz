@@ -64,6 +64,14 @@ export function ClientCard({
               >
                 Start a project
               </Link>
+              {isRevision ? null : (
+                <Link
+                  href={`/admin/billing/quotes/new?client=${client.id}&inquiry=${inquiryId}`}
+                  className={buttonClasses("secondary", "sm")}
+                >
+                  Write a quote
+                </Link>
+              )}
               <Button
                 size="sm"
                 variant="ghost"

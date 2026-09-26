@@ -1,22 +1,12 @@
 import "server-only";
-import path from "node:path";
-import { Document, Font, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { cv } from "@/content/cv";
 import { site } from "@/content/site";
 import { work } from "@/content/work";
+import { registerPdfFonts } from "@/server/pdf/fonts";
 
 // The CV as a PDF, generated from the same data as the /cv page.
-const FONT_DIR = path.join(process.cwd(), "node_modules", "geist", "dist", "fonts", "geist-sans");
-
-Font.register({
-  family: "Geist",
-  fonts: [
-    { src: path.join(FONT_DIR, "Geist-Regular.ttf"), fontWeight: 400 },
-    { src: path.join(FONT_DIR, "Geist-Medium.ttf"), fontWeight: 500 },
-    { src: path.join(FONT_DIR, "Geist-SemiBold.ttf"), fontWeight: 600 },
-  ],
-});
-Font.registerHyphenationCallback((word) => [word]);
+registerPdfFonts();
 
 const INK = "#111317";
 const MUTED = "#5b606b";

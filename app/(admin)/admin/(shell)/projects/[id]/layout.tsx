@@ -71,6 +71,12 @@ export default async function ProjectLayout({
             <Link href={`${base}/edit`} className={buttonClasses("secondary", "sm")}>
               Edit
             </Link>
+            <Link
+              href={`/admin/billing/invoices/new?project=${hexId}`}
+              className={buttonClasses("secondary", "sm")}
+            >
+              New invoice
+            </Link>
           </div>
         }
       />

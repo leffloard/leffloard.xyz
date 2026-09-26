@@ -1,9 +1,15 @@
 import "server-only";
 import { Cron } from "croner";
 import { runBackup } from "@/server/backup/service";
+import { reconcileCryptoPayments } from "@/server/billing/ipn";
+import { nowPaymentsConfig } from "@/server/billing/nowpayments";
+import { runRecurringJob } from "@/server/billing/recurring";
+import { runRemindersJob } from "@/server/billing/reminders";
 import { sendReminders } from "@/server/calendar/booking";
 import { getDb } from "@/server/db/client";
 import { getEnv } from "@/server/env";
+import { runRatesJob } from "@/server/finance/rates";
+import { runJob } from "@/server/jobs/runner";
 import { log } from "@/server/log";
 import { readChannels } from "@/server/notify/channels";
 import { drainOutbox } from "@/server/notify/outbox";
@@ -44,6 +50,66 @@ const JOBS: Job[] = [
       });
       // The outbox job sends them within a minute.
       if (sent) log.info({ sent }, "meeting reminders queued");
+    },
+  },
+  {
+    // TCMB's exchange rates for the finance reports: each morning, and after the 15:30 bulletin.
+    name: "fx-rates",
+    pattern: "*/30 * * * *",
+    run: async () => {
+      const outcome = await runRatesJob(await getDb());
+      if (outcome.ran) log.info({ ok: outcome.ok, result: outcome.message }, "exchange rates");
+    },
+  },
+  {
+    // Recurring invoices (care plans), issued and emailed during the day.
+    name: "recurring-invoices",
+    pattern: "*/15 * * * *",
+    run: async () => {
+      const outcome = await runRecurringJob(await getDb(), {
+        siteUrl: getEnv().SITE_URL,
+        channels: readChannels(),
+      });
+      if (outcome?.ran && outcome.message !== "0 issued") {
+        log.info({ ok: outcome.ok, result: outcome.message }, "recurring invoices");
+      }
+    },
+  },
+  {
+    // Crypto checkouts still pending are read again from NOWPayments, in case a callback was lost.
+    name: "payments-check",
+    pattern: "*/30 * * * *",
+    run: async () => {
+      const config = nowPaymentsConfig();
+      if (!config) return;
+      const db = await getDb();
+      const outcome = await runJob(
+        db,
+        "payments-check",
+        async () => {
+          const result = await reconcileCryptoPayments(db, config, {
+            siteUrl: getEnv().SITE_URL,
+            channels: readChannels(),
+          });
+          return `${result.checked} checked, ${result.settled} settled`;
+        },
+        { lockMs: 10 * 60_000, retryAfterFailureMs: 30 * 60_000 },
+      );
+      if (outcome.ran && !outcome.message.startsWith("0 checked")) {
+        log.info({ ok: outcome.ok, result: outcome.message }, "crypto payments checked");
+      }
+    },
+  },
+  {
+    // Reminders of overdue invoices, once a day.
+    name: "invoice-reminders",
+    pattern: "*/30 * * * *",
+    run: async () => {
+      const outcome = await runRemindersJob(await getDb(), {
+        siteUrl: getEnv().SITE_URL,
+        channels: readChannels(),
+      });
+      if (outcome.ran) log.info({ ok: outcome.ok, result: outcome.message }, "invoice reminders");
     },
   },
 ];
