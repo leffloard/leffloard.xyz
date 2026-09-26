@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Zap, Code, Rocket, Globe, MessageCircle, Shield, Box } from 'lucide-react';
+import { Check, Zap, Code, Rocket, Globe, MessageCircle, Shield, Box, RefreshCw } from 'lucide-react';
+import { contactHref } from '../lib/requests';
 
 const pricingPlans = [
   {
@@ -62,6 +63,7 @@ const servicesWithTiers = [
   {
     id: 'website',
     name: 'Website',
+    service: 'Web Development',
     description: 'Landing pages, portfolios, business sites, and full web apps. React, Next.js, responsive.',
     icon: Globe,
     tiers: [
@@ -74,6 +76,7 @@ const servicesWithTiers = [
   {
     id: 'discord-bot',
     name: 'Discord Bot',
+    service: 'Discord Bot',
     description: 'Custom Discord bots: moderation, automation, tickets, economy, games, and integrations.',
     icon: MessageCircle,
     tiers: [
@@ -86,6 +89,7 @@ const servicesWithTiers = [
   {
     id: 'auth-systems',
     name: 'Auth Systems',
+    service: 'Authentication System',
     description: 'Login, registration, OAuth, 2FA, session handling, and role-based access control.',
     icon: Shield,
     tiers: [
@@ -98,6 +102,7 @@ const servicesWithTiers = [
   {
     id: 'protected-loaders',
     name: 'Protected Loaders',
+    service: 'Loader / Desktop App',
     description: 'Custom loaders and overlay UIs: injectors, config panels, internal menus, game tools.',
     icon: Box,
     tiers: [
@@ -122,6 +127,16 @@ const Pricing = () => {
           </h1>
           <p className="text-gray-400 mt-4 max-w-2xl mx-auto">
             Detailed pricing by service. All prices are one-time per project. Need something custom? Get in touch.
+          </p>
+          <p className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full border border-gray-800 bg-[#0f0f10] px-4 py-2 text-sm text-gray-400">
+            <RefreshCw className="text-cyan-400" size={14} aria-hidden="true" />
+            Already a client?
+            <Link
+              to={contactHref({ type: 'revision' })}
+              className="font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+            >
+              Request a revision
+            </Link>
           </p>
         </div>
 
@@ -159,7 +174,12 @@ const Pricing = () => {
                         ))}
                       </ul>
                       <Link
-                        to="/#contact"
+                        to={contactHref({
+                          type: 'inquiry',
+                          service: service.service,
+                          subject: `Quote: ${service.name} - ${tier.name}`,
+                        })}
+                        aria-label={`Get a quote for ${service.name} ${tier.name}`}
                         className="block w-full py-3 rounded-lg border border-gray-700 text-center text-sm font-medium text-white hover:border-cyan-400 hover:text-cyan-400 transition-colors"
                       >
                         Get a quote
@@ -230,7 +250,12 @@ const Pricing = () => {
                   </ul>
 
                   <Link
-                    to="/#contact"
+                    to={contactHref({
+                      type: 'inquiry',
+                      service: 'Web Development',
+                      subject: `Quote: ${plan.name} bundle`,
+                    })}
+                    aria-label={`Get started with the ${plan.name} bundle`}
                     className={`block w-full py-4 rounded-lg font-semibold text-center transition-all duration-300 ${
                       plan.highlighted
                         ? 'bg-cyan-400 text-black hover:bg-cyan-300 hover:shadow-lg hover:shadow-cyan-400/30'
@@ -250,7 +275,7 @@ const Pricing = () => {
             Hourly rate available for ongoing work or maintenance.
           </p>
           <Link
-            to="/#contact"
+            to={contactHref({ type: 'inquiry', subject: 'Custom quote' })}
             className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
           >
             Contact me for a custom quote →
