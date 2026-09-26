@@ -31,6 +31,8 @@ leffloard.xyz/
 │   ├── src/
 │   │   ├── components/           # UI components (Hero, About, Blog, etc.)
 │   │   │   ├── ui/               # Low-level UI primitives (Button, Input, etc.)
+│   │   │   ├── admin/            # Admin panel served at /admin
+│   │   │   ├── RequestForm.jsx   # Appointment, revision and inquiry form
 │   │   │   └── ...
 │   │   ├── data/                 # Static mock data or configurations
 │   │   ├── hooks/                # Custom React hooks
@@ -41,12 +43,18 @@ leffloard.xyz/
 │   └── package.json              # NPM dependencies and script definitions
 │
 ├── backend/                      # FastAPI application codebase
-│   ├── server.py                 # Core server logic and API routing
-│   ├── requirements.txt          # Python dependency specifications
-│   └── .env.example              # Sample environment variables file
+│   ├── server.py                 # App setup, API routes and frontend hosting
+│   ├── schemas.py                # Validation rules for requests and admin updates
+│   ├── notify.py                 # Discord webhook and email notifications
+│   ├── security.py               # Admin tokens, password checks and rate limiting
+│   ├── config.py                 # Settings read from backend/.env
+│   ├── hash_password.py          # Generates the admin password hash
+│   ├── requirements.txt          # Runtime dependencies
+│   ├── requirements-dev.txt      # Test dependencies
+│   └── .env.example              # Documented configuration template
 │
-├── tests/                        # Automated testing suite directory
-│   └── __init__.py
+├── tests/                        # Backend API test suite (pytest)
+├── pytest.ini                    # Test runner configuration
 │
 └── egefitnessalwaysinbussinies.bat # Convenience startup batch script (Windows)
 ```
@@ -55,21 +63,16 @@ leffloard.xyz/
 
 ## Getting Started
 
-### Quick Start (Windows)
-To start both the frontend and backend development servers concurrently, execute the provided batch script in the root directory:
-```cmd
-egefitnessalwaysinbussinies.bat
-```
-This script opens a new command prompt window to host the FastAPI uvicorn server, and runs the Vite development server in the current terminal window.
+Follow the [Manual Installation](#manual-installation) steps once to install the dependencies and create `backend/.env`. After that, the [development shortcut](#development-shortcut-windows) can start both servers on Windows.
 
 ---
 
 ## Manual Installation
 
 ### Prerequisites
-- Node.js (v18 or higher)
-- Python (v3.10 or higher)
-- MongoDB instance (running locally or hosted via MongoDB Atlas)
+- Node.js 20.19 or newer (required by Vite 7)
+- Python 3.11 or newer (3.11 to 3.14 are supported, on Windows and Linux)
+- MongoDB: a local MongoDB Community Server or a free MongoDB Atlas cluster
 
 ### Backend Setup
 1. Navigate to the backend directory:
@@ -88,23 +91,55 @@ This script opens a new command prompt window to host the FastAPI uvicorn server
    ```bash
    pip install -r requirements.txt
    ```
-4. Copy the environment configuration file and provide your database credentials:
+4. Create your configuration file from the template. Every variable is explained in `.env.example`:
    ```bash
    copy .env.example .env
    # macOS/Linux:
    cp .env.example .env
    ```
-   Modify `.env` as required:
-   ```env
-   MONGO_URL=mongodb://localhost:27017
-   DB_NAME=leffloard
-   CORS_ORIGINS=http://localhost:5173
+5. Point `MONGO_URL` and `DB_NAME` at your database (see [MongoDB](#mongodb) below).
+6. Create the admin login for `/admin`. The script asks for the password twice and prints the lines to paste into `.env`:
+   ```bash
+   python hash_password.py --secret
    ```
-5. Run the ASGI server:
+   This prints `ADMIN_PASSWORD_HASH=...` and a random `ADMIN_JWT_SECRET=...`. Only the hash is stored, never the password. Until both values are set, the admin API answers `503 Admin panel is not configured.`
+7. Optionally configure notifications (see [Notifications](#notifications)). Each channel is skipped while it is not configured.
+8. Run the server:
    ```bash
    python -m uvicorn server:app --reload
    ```
-   The backend API will be available at `http://127.0.0.1:8000`.
+   The API is available at `http://127.0.0.1:8000/api`, with interactive documentation at `http://127.0.0.1:8000/api/docs`. The startup log shows whether the admin panel, Discord and email are enabled, and warns about invalid values.
+
+#### MongoDB
+- **Local:** install [MongoDB Community Server](https://www.mongodb.com/try/download/community) (the Windows installer can run it as a service) and use `MONGO_URL=mongodb://localhost:27017`.
+- **MongoDB Atlas (free tier):** create an M0 cluster, add a database user under *Database Access*, allow your server's IP address under *Network Access*, then copy the driver connection string (`mongodb+srv://<user>:<password>@<cluster>.mongodb.net/...`) into `MONGO_URL`.
+
+The `requests` collection and its indexes are created automatically on startup.
+
+#### Notifications
+Every new request is stored in MongoDB (visible in the admin panel) and, when configured, also sent to Discord and by email. Notifications are sent in the background after the visitor has received a response, so a slow or failing channel never affects the form; failures are logged.
+- **Discord:** in your server open *Server Settings -> Integrations -> Webhooks -> New Webhook*, pick the channel, then *Copy Webhook URL* and set `DISCORD_WEBHOOK_URL`. Treat the URL as a secret. Messages never ping anyone.
+- **Email (Gmail example):** turn on 2-Step Verification for the Google account, create an app password at <https://myaccount.google.com/apppasswords>, then set:
+  ```env
+  SMTP_HOST=smtp.gmail.com
+  SMTP_PORT=587
+  SMTP_SECURITY=starttls
+  SMTP_USERNAME=you@gmail.com
+  SMTP_PASSWORD=your16charapppassword
+  SMTP_FROM=leffloard.xyz <you@gmail.com>
+  NOTIFY_EMAIL_TO=you@gmail.com
+  ```
+  Notification emails use the client's address as Reply-To, so you can answer directly. The same SMTP settings are used when you choose to email a client about a status change from the admin panel.
+
+Set `SITE_URL` (for example `https://leffloard.xyz`) so notifications include a link to the admin panel.
+
+#### Running the tests
+From the repository root:
+```bash
+pip install -r backend/requirements-dev.txt
+python -m pytest -q
+```
+The tests use an in-memory MongoDB replacement and mocked Discord/SMTP senders, so no database or network access is needed.
 
 ### Frontend Setup
 1. Navigate to the frontend directory:
@@ -119,19 +154,59 @@ This script opens a new command prompt window to host the FastAPI uvicorn server
    ```bash
    npm run dev
    ```
-   The frontend interface will be available at `http://localhost:5173`.
+   The frontend interface will be available at `http://localhost:5173`. Requests to `/api` are proxied to the backend at `http://127.0.0.1:8000`, so start the backend first to use the contact form and `/admin`.
+
+### Development shortcut (Windows)
+`egefitnessalwaysinbussinies.bat` in the root directory opens a new command prompt window running the FastAPI server with `--reload` and runs the Vite development server in the current window:
+```cmd
+egefitnessalwaysinbussinies.bat
+```
+It is the author's own shortcut: it expects the project at `C:\Users\Leff\Desktop\leffloard.xyz` and uses the global `python`, so edit the paths (for example to `backend\venv\Scripts\python.exe`) if your setup differs. It starts development servers only; see [Deployment](#deployment) for running the site in production.
 
 ---
 
 ## API Endpoints
 
-The FastAPI backend exposes the following API routing structure:
+All endpoints live under `/api` and exchange JSON. Interactive documentation is available at `/api/docs`.
 
-| Method | Endpoint | Description |
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| **GET** | `/api/health` | Public | Health check, returns `{"ok": true}`. |
+| **POST** | `/api/requests` | Public | Submits an appointment, revision or general inquiry request. |
+| **POST** | `/api/admin/login` | Public | Exchanges the admin password for a bearer token valid for 12 hours. |
+| **GET** | `/api/admin/me` | Admin | Reports which notification channels are configured: `discord`, `email` (new-request emails to you) and `client_email` (status emails to clients, which only need the SMTP settings). |
+| **GET** | `/api/admin/requests` | Admin | Lists requests, newest first. Query: `status`, `type`, `q` (searches name, email, subject and project reference), `page`, `limit` (max 100). Returns `items`, `total` and per-status `counts`. |
+| **GET** | `/api/admin/requests/{id}` | Admin | Returns one request. |
+| **PATCH** | `/api/admin/requests/{id}` | Admin | Updates `status`, `admin_note` or `scheduled_at` (appointments only, ISO 8601 with offset). With `notify_client: true` and an optional `client_message`, emails the client; the response includes `client_notified`. |
+| **DELETE** | `/api/admin/requests/{id}` | Admin | Deletes a request. |
+
+Admin endpoints require the header `Authorization: Bearer <token>` and answer `401 Not authenticated.` for a missing, invalid or expired token.
+
+### Submitting a request
+`POST /api/requests` accepts:
+
+| Field | Required | Rules |
 | :--- | :--- | :--- |
-| **GET** | `/api/` | Base endpoint, returns server greeting message. |
-| **POST** | `/api/status` | Commits a new status check document to the database. |
-| **GET** | `/api/status` | Retrieves a list of all status checks from the database. |
+| `type` | Always | `appointment`, `revision` or `inquiry` |
+| `name` | Always | 1-80 characters |
+| `email` | Always | Valid address, up to 254 characters |
+| `subject` | Always | 1-120 characters |
+| `message` | Always | 1-4000 characters, line breaks allowed |
+| `contact_handle` | No | Discord or Telegram handle, up to 80 characters |
+| `service` | No | `Web Development`, `Discord Bot`, `Authentication System`, `Loader / Desktop App` or `Other` |
+| `project_reference` | Revisions | Project or order name, up to 120 characters |
+| `preferred_date` | Appointments | `YYYY-MM-DD`, from today up to 120 days ahead in the client's time zone |
+| `preferred_time` | Appointments | `HH:MM`, 24-hour clock |
+| `timezone` | Appointments | IANA time zone name, e.g. `Europe/Istanbul` |
+| `duration_minutes` | No | Appointments only: 15, 30, 45 or 60 (default 30) |
+
+Text is trimmed and control characters are rejected. Scheduling fields are ignored for other request types, and unknown fields are ignored.
+
+- `201` returns `{"id", "status": "new", "created_at"}`.
+- `422` returns `{"detail": [{"field": "...", "message": "..."}]}` so the form can show each message next to its field.
+- `429` is returned after 5 accepted submissions from the same IP address within 10 minutes. Admin login allows 5 failed attempts per IP address per 15 minutes. IPv6 addresses count per `/64` network, and behind a proxy see [`TRUST_PROXY`](#https-with-a-reverse-proxy-or-cloudflare-tunnel).
+
+Request statuses are `new`, `confirmed`, `declined` and `completed`; every status change is recorded in the request's `history`.
 
 ---
 
@@ -145,22 +220,68 @@ The React interface is composed of modular components:
 - **Projects**: Portfolio listing and search interface.
 - **Pricing**: Freelance rates and package matrices.
 - **Blog & BlogDetails**: Layouts for listing posts and reading individual blog entries.
-- **Contact**: User inquiry submission forms.
+- **Contact**: Request form for booking a call, requesting a revision of delivered work or sending a general inquiry. Links such as `/?type=appointment#contact-form` (used by the header and the pricing page) preselect the request type, service and subject.
+- **Admin** (`/admin`): Password-protected panel to review requests, filter and search them, confirm, decline or complete them, schedule appointments, keep private notes and optionally email the client about the update.
 
 ---
 
 ## Deployment
 
-### Frontend Production Build
-To generate static assets for hosting (e.g. Netlify, Vercel, or GitHub Pages):
-```bash
-cd frontend
-npm run build
-```
-Upload the contents of the generated `frontend/dist` directory to your hosting provider.
+### Single server (recommended)
+One Python process serves both the API and the built website, which suits a single Windows VDS or Linux VPS.
 
-### Backend Hosting
-The FastAPI backend can be served using Uvicorn or Gunicorn inside a containerized setup (Docker), or deployed directly to application hosts such as Render, Railway, or VPS environments.
+1. Build the frontend:
+   ```bash
+   cd frontend
+   npm ci
+   npm run build
+   ```
+   FastAPI serves `frontend/dist` automatically and answers client-side routes such as `/pricing`, `/blog/1` and `/admin` with `index.html`. Set `FRONTEND_DIST` if the build lives elsewhere. Unknown `/api/...` paths still return JSON `404` responses.
+2. Configure `backend/.env` as described in [Backend Setup](#backend-setup), including `SITE_URL`. Leave `CORS_ORIGINS` empty, because the site and the API share one origin.
+3. Start the server without `--reload`. From the `backend` directory, with the virtual environment activated:
+   ```bash
+   python -m uvicorn server:app --host 0.0.0.0 --port 8000
+   ```
+   The whole site is now available on port 8000. Open the port in the firewall if visitors connect to it directly.
+4. Keep it running after reboots. A startup task or service neither starts in the `backend` directory nor activates the virtual environment, so give it full paths. The examples assume the project lives in `C:\leffloard.xyz`:
+   - **Task Scheduler (Windows):** *Create Task*, choose *Run whether user is logged on or not*, add the trigger *At startup* and the action *Start a program* with:
+     - Program/script: `C:\leffloard.xyz\backend\venv\Scripts\python.exe`
+     - Add arguments: `-m uvicorn server:app --app-dir C:\leffloard.xyz\backend --host 0.0.0.0 --port 8000`
+     - Start in: `C:\leffloard.xyz\backend`
+
+     On the *Settings* tab, clear *Stop the task if it runs longer than*.
+   - **NSSM (Windows service):**
+     ```cmd
+     nssm install leffloard C:\leffloard.xyz\backend\venv\Scripts\python.exe -m uvicorn server:app --app-dir C:\leffloard.xyz\backend --host 0.0.0.0 --port 8000
+     nssm set leffloard AppDirectory C:\leffloard.xyz\backend
+     nssm start leffloard
+     ```
+   - **systemd (Linux):** set `WorkingDirectory=/path/to/leffloard.xyz/backend` and `ExecStart=/path/to/leffloard.xyz/backend/venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8000`.
+
+#### HTTPS with a reverse proxy or Cloudflare Tunnel
+For HTTPS on your own domain, run uvicorn on `--host 127.0.0.1` and put a reverse proxy (Caddy, nginx or IIS) or a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) in front of it, pointing to `http://127.0.0.1:8000` (use `127.0.0.1`, not `localhost`). A tunnel needs no open inbound ports.
+
+Rate limiting counts requests per visitor address. Proxies add the address they received a request from to the end of the `X-Forwarded-For` header, after anything the visitor sent, so only the entries added by your own proxies can be trusted. `TRUST_PROXY` is the number of proxies between the visitor and uvicorn. A single proxy or tunnel on the same machine needs no setting, because uvicorn already reads the header on connections from `127.0.0.1` or `::1`:
+
+| Setup | `TRUST_PROXY` |
+| :--- | :--- |
+| Visitors connect to uvicorn directly | `0` |
+| A proxy or tunnel on the same machine (Caddy, nginx, IIS, `cloudflared`) connects to `127.0.0.1` | `0` |
+| Cloudflare's proxy (orange cloud) or another proxy on a different machine connects to uvicorn | `1` |
+| Cloudflare's proxy (orange cloud) in front of nginx or IIS on the same machine | `2` |
+
+Never set a number higher than the real number of proxies, and with `1` or more make sure visitors cannot bypass the proxy (for Cloudflare, only allow [Cloudflare's IP ranges](https://www.cloudflare.com/ips/) through the firewall); otherwise a visitor can choose the address the rate limiter sees. Never start uvicorn with `--forwarded-allow-ips="*"` for the same reason. The startup log mentions the setting when it is not `0`.
+
+### Split hosting
+The frontend can also be hosted as static files (Netlify, Vercel, GitHub Pages) with the API on a separate server:
+
+1. Build the frontend with the API address, for example by creating `frontend/.env.production` containing:
+   ```env
+   VITE_API_URL=https://api.leffloard.xyz
+   ```
+   and running `npm run build`. Without `VITE_API_URL` the frontend calls `/api` on its own origin, which is what the single-server setup and the Vite development proxy use.
+2. Configure the static host to rewrite unknown paths to `index.html`, so `/pricing` and `/admin` work on reload.
+3. On the API server, set `CORS_ORIGINS` to the frontend origin(s), for example `CORS_ORIGINS=https://leffloard.xyz,https://www.leffloard.xyz`, and run uvicorn as above.
 
 ---
 
