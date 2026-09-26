@@ -34,6 +34,7 @@ export type RoundRow = {
   requested: string;
   taskId: string | null;
   inquiryId: string | null;
+  fromPortal: boolean;
 };
 
 // "2 of 3 included rounds used", with a bar that turns amber on the last one and red past it.
@@ -243,6 +244,7 @@ export function RevisionsPanel({
                     ) : round.status !== "cancelled" ? (
                       <Badge>included</Badge>
                     ) : null}
+                    {round.fromPortal ? <Badge tone="accent">from the portal</Badge> : null}
                     <span className="text-xs text-muted">{round.requested}</span>
                   </div>
                   {round.details ? (

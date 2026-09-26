@@ -34,6 +34,7 @@ export default async function ProjectRevisionsPage({ params }: { params: Promise
         details: round.details,
         status: round.status,
         billable: round.billable,
+        fromPortal: round.fromPortal === true,
         price: round.price ? formatMoney(round.price) : null,
         requested: formatDate(round.requestedAt),
         taskId: round.taskId?.toHexString() ?? null,

@@ -47,6 +47,11 @@ export default function PrivacyPage() {
           coin and the amount paid. I never see card details, wallet keys or bank logins.
         </li>
         <li>
+          <strong>The client portal</strong>: the email address you sign in with and when you last signed in;
+          for each browser you are signed in on, its IP address and browser type; the updates I post on your
+          projects; and the revision and data requests you send from it.
+        </li>
+        <li>
           <strong>Technical data</strong> needed to run the site securely: IP address, browser type and the
           time of a request, used for rate limits, abuse prevention and security logs.
         </li>
@@ -66,6 +71,11 @@ export default function PrivacyPage() {
           To deliver and invoice a project, confirm payments and remind you of an unpaid invoice: performance
           of a contract, and legal obligations for accounting.
         </li>
+        <li>
+          To let you follow your projects, invoices and calls in the client portal and send requests from it:
+          performance of a contract.
+        </li>
+        <li>To answer a request about your data: my legal obligations under KVKK and the GDPR.</li>
         <li>To keep the site secure: my legitimate interest in preventing abuse.</li>
       </ul>
       <h2>Who processes it for me</h2>
@@ -75,7 +85,10 @@ export default function PrivacyPage() {
         <li>
           Google (Gmail, Google Calendar): email, and my own calendar, which shows the calls booked with me.
         </li>
-        <li>Discord: private notifications to me about new messages and bookings.</li>
+        <li>
+          Discord: private notifications to me about new messages, bookings, and the requests clients send
+          from the portal, including what they wrote.
+        </li>
         <li>
           Jitsi Meet (meet.jit.si, run by 8x8): our video calls. The room&apos;s link is made on this site and
           nothing from your booking is sent to Jitsi, but it carries the call itself.
@@ -97,14 +110,17 @@ export default function PrivacyPage() {
         the site sends are kept for 30 days to check they arrived. Client records, quotes, invoices and
         payments are kept for as long as Turkish tax and commercial law requires (up to 10 years). The payment
         provider&apos;s notifications about a payment are kept for about 13 months. Security logs are kept for
-        up to 12 months.
+        up to 12 months. A sign-in link for the client portal works once and expires after 20 minutes (an
+        invitation after 7 days); a portal sign-in ends after 7 days without use and is deleted at the latest
+        30 days after it started. Project updates and your data requests are kept with your client record.
       </p>
       <h2>Your rights</h2>
       <p>
         You can ask whether I process your data, get a copy of it, have it corrected or deleted, object to its
         processing, and ask where it was transferred. Under KVKK Article 11 and the GDPR you may also complain
         to the Turkish Personal Data Protection Authority or your local EU data protection authority. To use
-        any of these rights, email <a href={`mailto:${site.email}`}>{site.email}</a>. I answer within 30 days.
+        any of these rights, email <a href={`mailto:${site.email}`}>{site.email}</a>, or, if you are a client,
+        use the Account page of the client portal. I answer within 30 days.
       </p>
       <h2>Changes</h2>
       <p>

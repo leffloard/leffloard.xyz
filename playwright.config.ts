@@ -21,7 +21,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /(admin-(inbox|settings|work)|calendar|billing)\.spec\.ts/,
+      testIgnore: /(admin-(inbox|settings|work)|calendar|billing|portal)\.spec\.ts/,
       use: chromium,
     },
     {
@@ -51,6 +51,13 @@ export default defineConfig({
       name: "billing",
       testMatch: /billing\.spec\.ts/,
       dependencies: ["calendar"],
+      use: chromium,
+    },
+    {
+      // The client portal: after billing, whose projects it checks it can't see.
+      name: "portal",
+      testMatch: /portal\.spec\.ts/,
+      dependencies: ["billing"],
       use: chromium,
     },
   ],

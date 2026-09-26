@@ -31,6 +31,7 @@ import {
   setRevisionPolicy,
   setRevisionStatus,
 } from "@/server/projects/revisions";
+import { addProjectUpdate } from "@/server/portal/updates";
 import { createTask, getTask } from "@/server/tasks/store";
 import { addEntry } from "@/server/time/store";
 import { clientInput, projectInput } from "../helpers/work";
@@ -229,13 +230,15 @@ describe("projects", () => {
     });
   });
 
-  it("deletes a project with its tasks, rounds and time", async () => {
+  it("deletes a project with its tasks, rounds, time and portal updates", async () => {
     const client = await aClient();
     const project = (await createProject(db(), projectInput(client._id), {}, T0))!;
     const other = (await createProject(db(), projectInput(client._id, { title: "Other" }), {}, T0))!;
     await createTask(db(), { title: "a", projectId: project._id }, T0);
     await createTask(db(), { title: "b", projectId: other._id }, T0);
     await addRevision(db(), project._id, { title: "r", details: "" }, T0);
+    await addProjectUpdate(db(), project, "Staging is up.", false, T0);
+    await addProjectUpdate(db(), other, "Kept.", false, T0);
     await db().collection("activities").insertOne({
       clientId: client._id,
       projectId: project._id,
@@ -244,9 +247,15 @@ describe("projects", () => {
       at: T0,
       createdAt: T0,
     });
-    expect(await deleteProject(db(), project._id)).toEqual({ tasks: 1, revisions: 1, timeEntries: 0 });
+    expect(await deleteProject(db(), project._id)).toEqual({
+      tasks: 1,
+      revisions: 1,
+      timeEntries: 0,
+      updates: 1,
+    });
     expect(await getProject(db(), project._id)).toBeNull();
     expect(await db().collection("tasks").countDocuments()).toBe(1);
+    expect(await db().collection("project_updates").countDocuments()).toBe(1);
     expect(await db().collection("activities").countDocuments({ projectId: null })).toBe(1);
     expect(await deleteProject(db(), project._id)).toBeNull();
   });

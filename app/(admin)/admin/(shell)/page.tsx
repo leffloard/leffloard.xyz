@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/admin/shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ADMIN_TIME_ZONE, formatRelative, plural } from "@/lib/format";
+import { ADMIN_TIME_ZONE, formatDate, formatRelative, plural } from "@/lib/format";
 import { recentAudit } from "@/server/auth/audit";
 import { requireAdmin } from "@/server/auth/dal";
 import { listPasskeys } from "@/server/auth/passkeys";
@@ -25,16 +25,16 @@ import { listProjects } from "@/server/projects/store";
 import { listTasks } from "@/server/tasks/store";
 import { toTaskRow } from "@/server/tasks/view";
 import { countRequests, upcomingMeetings } from "@/server/calendar/meetings";
+import { openPrivacyRequests } from "@/server/portal/privacy";
 import type { MeetingDoc } from "@/server/calendar/types";
 
 export const metadata = { title: "Today" };
 
 const ROADMAP = [
-  ["M7", "Quotes, invoices, crypto and bank payments, finance"],
-  ["M8", "Client portal"],
   ["M9", "Content editor for the public site, and GitHub sync"],
   ["M10", "AI assistant"],
   ["M11", "Analytics, notification centre, command palette"],
+  ["M12", "Security tests, load tests and launch"],
 ] as const;
 
 function greeting(at: Date): string {
@@ -64,6 +64,7 @@ export default async function TodayPage() {
     openProjects,
     meetings,
     requests,
+    dataRequests,
   ] = await Promise.all([
     listSessions(db, user._id),
     listPasskeys(db, user._id),
@@ -76,6 +77,7 @@ export default async function TodayPage() {
     listProjects(db, { view: "open" }),
     upcomingMeetings(db, at, 6),
     countRequests(db, at),
+    openPrivacyRequests(db),
   ]);
   const channels = channelStatus();
   const profile = toPublicUser(user);
@@ -139,6 +141,33 @@ export default async function TodayPage() {
             )}
           </CardBody>
         </Card>
+
+        {dataRequests.length ? (
+          <Card className="md:col-span-2">
+            <CardHeader
+              title="Data requests"
+              description="Clients asked in their portal for a copy of their data or its deletion."
+            />
+            <CardBody>
+              <ul className="divide-y divide-line">
+                {dataRequests.map((row) => (
+                  <li key={row.id}>
+                    <Link
+                      href={`/admin/clients/${row.clientId}`}
+                      className="flex min-w-0 items-baseline gap-3 py-2 text-[13px] hover:text-accent"
+                    >
+                      <Badge tone="warning">{row.kind === "export" ? "Copy of data" : "Deletion"}</Badge>
+                      <span className="min-w-0 flex-1 truncate font-medium">{row.clientName}</span>
+                      <span className="shrink-0 text-xs text-muted">
+                        answer by {formatDate(row.answerBy)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+        ) : null}
 
         <Card className="md:col-span-2">
           <CardHeader

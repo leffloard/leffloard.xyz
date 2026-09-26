@@ -71,6 +71,12 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
 - A guest's manage link is a secret: store only `hashToken()` and the sealed copy, never log the link or keep
   it in other records (the development-only `EMAIL_DELIVERY=log` prints whole emails, links included), and
   keep `/meeting/` pages noindex with no referrer. A secret booking type is found only with its `linkKey`.
+- The client portal reaches data only through `requirePortalClient()` / `currentPortalClient()`
+  (`server/portal/dal.ts`) and queries that filter by that client's id (`server/portal/views.ts`): another
+  client's record must be not found (404), never loaded and then refused. Portal sessions and admin sessions
+  stay separate (their own collections and cookies); never accept one for the other.
+- A portal sign-in link is spent only by the POST to `/api/portal/verify`, never by a GET (mail scanners open
+  links). Store only the SHA-256 of links and session tokens, and never log them.
 - Every change comes with tests. Unit tests need no database; integration tests use the throwaway replica set
   from `tests/integration/global-setup.ts`.
 - Content scope: no case studies, marketing copy or pricing for game-modification projects or cheat loaders.

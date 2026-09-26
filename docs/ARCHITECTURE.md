@@ -5,8 +5,8 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M7, money: quotes, invoices, payments (bank
-transfer and NOWPayments crypto), recurring invoices, expenses and the finance reports**.
+This document grows with each milestone. Current state: **M8, the client portal: sign-in by emailed link,
+projects with their updates and deliverables, revision requests, invoices, calls and data requests**.
 
 ## Layout
 
@@ -18,6 +18,8 @@ app/                      Routes (App Router)
     q/[publicId]/         A quote's link: read it, accept or decline it, its PDF
     i/[publicId]/         An invoice's link: how to pay (bank details, crypto), its PDF
     pay/return/           Where NOWPayments sends the client back after paying
+    portal/               The client portal: sign-in and its link's page, projects, invoices and quotes, calls,
+                          account
   sitemap.ts, robots.ts   Machine-readable files (plus manifest.ts and .well-known/security.txt)
   (admin)/admin/          Admin, with its own root layout (dynamic, noindex)
     login/, setup/        Sign-in, two-step check, first-time authenticator setup
@@ -31,6 +33,8 @@ app/                      Routes (App Router)
   api/quotes/[publicId]/  The client accepts or declines a quote
   api/invoices/[publicId]/checkout/  The client starts paying an invoice in crypto (a NOWPayments page)
   api/payments/nowpayments/  NOWPayments' payment callbacks (IPN)
+  api/portal/             The portal: asking for a sign-in link, signing in with it, signing out, revision
+                          and data requests
   api/requests/route.ts   The v1 form API, same contract as v1 (kept until the legacy code is removed)
   api/[[...path]]/        JSON 404 for unknown API addresses
   api/health/route.ts     Health check (shallow and deep)
@@ -48,6 +52,7 @@ lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, C
   billing/                Document lines, totals, discounts, taxes and payment schedules; statuses and their
                           words; IBAN checks; the billing forms; recurring dates and periods
   finance/                TCMB bulletins and exact conversions, expense categories, receivables' ages, CSV
+  portal/                 The portal's form rules
 server/                   Server-only code (every file imports "server-only")
   env.ts                  Validated configuration, plain-English errors
   boot.ts                 Runs once at start-up (via instrumentation.ts); stops on bad config
@@ -69,6 +74,8 @@ server/                   Server-only code (every file imports "server-only")
                           NOWPayments client and its callbacks, recurring invoices, reminders, emails, PDFs
   finance/                Expenses, exchange rates (fetching and storing TCMB's bulletins), the reports and
                           the accountant's CSV
+  portal/                 The client portal: sign-in links and sessions, what a signed-in client may see,
+                          project updates, data requests, its emails and the owner's alerts
   pdf/                    The fonts every generated PDF uses
   work/collections.ts     The work modules' collections, so their stores do not import each other
   notify/                 Notification channels, templates, escaping, the outbox, SMTP and Discord senders
@@ -464,6 +471,53 @@ invoice is paid by bank transfer or in crypto through NOWPayments. `lib/billing`
   opens as columns on a Turkish Windows. Text a spreadsheet would run as a formula is defused. Exporting asks
   to confirm it's you and is audited.
 
+## Client portal
+
+A client's own view of their work with the owner (M8), at `/portal`. `server/portal` holds its flows; every
+page and endpoint reaches data through `requirePortalClient()` (`server/portal/dal.ts`) and the queries in
+`server/portal/views.ts`, which all filter by the signed-in client's id.
+
+- **Who gets in.** The owner turns the portal on for a client by inviting them from the client's page (or it
+  is turned on when a client who never had it accepts a quote); turning it off signs the client out
+  everywhere and spends their links. A client signs in with a link emailed to them: they type their address
+  at `/portal/login` (Turnstile, a hidden field for bots, 5 requests per 15 minutes per connection and 3
+  links an hour per address), and the answer is the same whether or not the address has a portal, so the
+  form tells nobody who is a client: the links are made and queued after the answer has gone out, so it
+  takes as long either way. An address shared by several clients gets one email with a link for each.
+- **Links are spent by a person, not by opening them.** A sign-in link lasts 20 minutes, an invitation 7
+  days; only the SHA-256 of its secret is stored. Opening the link shows a page with a button, and only the
+  button's POST to `/api/portal/verify` uses it up (deleting it: whoever deletes it first gets in), so a mail
+  scanner that follows every link in an email spends nothing.
+- **Sessions of their own.** A portal session is a random token in its own cookie (`__Host-lf_portal`,
+  HttpOnly, Secure, SameSite=Lax) and collection, so no portal cookie can ever pass an admin check or the
+  other way round. It ends after 7 days unused or 30 days in all, and the client can sign out here or
+  everywhere; the owner sees how many are active and can end them. Sessions and links are left out of
+  backups.
+- **What a client sees**: their projects (not cancelled ones) with the steps, the owner's updates, the links
+  the owner marked as shared (only http(s) addresses become links) and the revision rounds; their issued
+  invoices, credit notes and the quotes they were sent, each opening its own link's page to pay or answer;
+  their calls, with the link to move or cancel each, and the booking types kept for clients (visibility
+  "portal": not listed on `/book`, and booked through a link that carries the type's key); their details,
+  and their data requests. Another client's project, by any address, answers 404.
+- **Revision requests** count against the project's included rounds in the same transaction as the M5
+  counter. A round past the included ones needs the client's agreement to its price: the form sends the
+  price the client saw, and the transaction compares it with the price of that moment, so a page opened
+  before the last included round was used, or before the price changed, cannot slip an extra one through:
+  the server answers with the current price, and the form asks again. A paused project takes no requests.
+  The owner is told by email and Discord, and the round is marked as coming from the portal.
+- **Updates.** The owner posts a note on a project ("the staging site is up"), emailed to the client if
+  asked (with the way to the portal only while theirs is on). Updates follow their project to another
+  client, and are exported and deleted with it.
+- **Data requests.** A client asks for a copy of their data or for its deletion (KVKK Article 11, GDPR
+  Articles 15 and 17). One open request of each kind per client (a unique partial index); the owner is told
+  and answers within 30 days. A copy is the client's export (M5), and the request is marked done or declined
+  with a note for the record. A deletion is answered by deleting the client: the request goes with the rest
+  of their data, and the audit log's entry for the deletion counts the requests it answered.
+- **Endpoints** take small JSON bodies only from the site's own pages (the Origin and `Sec-Fetch-Site`
+  check), are rate-limited per connection (signing out aside), and every email and alert goes through the
+  outbox with a `dedupeKey`. The portal's pages are dynamic, noindex, under the nonce CSP, and `robots.txt` keeps crawlers
+  out.
+
 ## Operations
 
 The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
@@ -503,10 +557,11 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
 - Every public page is checked with axe (WCAG 2.2 AA) in both themes, and for horizontal overflow at 360px;
   the admin's pages are checked with axe as the tests go through them.
 - Admin tests that share data run in order: the sign-in tests, then the inbox and settings, then the work
-  modules, then booking and the calendar, then billing (Playwright project dependencies in
-  `playwright.config.ts`). The calendar tests book as visitors in London and New York, and check the invites
+  modules, then booking and the calendar, then billing, then the portal (Playwright project dependencies
+  in `playwright.config.ts`). The calendar tests book as visitors in London and New York, and check the invites
   the emails carry; the billing tests go from a quote to a crypto payment, a bank transfer and its refund, a
-  care plan, an expense and the accountant's CSV.
+  care plan, an expense and the accountant's CSV; the portal tests go from the owner's invitation to the
+  client's sign-in, revision rounds (one of them extra), a data request and the owner's answer.
 - The integration tests' `mongod` closes idle files and checkpoints every second: every test file rebuilds
   its database before each test, and WiredTiger would otherwise hold thousands of files and abort at the
   open files limit.
@@ -625,3 +680,11 @@ Every direct dependency and why it is here.
 26. **Reminders and recurring invoices are claimed in the database before they are sent** (a conditional
     update, a unique period per plan), like every other message, so a restart or a second process never
     sends one twice.
+27. **Emailed sign-in links instead of client passwords.** Clients visit a few times a month; a link needs
+    no password to forget, reuse or leak, and the owner's mailbox provider is already trusted with their
+    invoices. Links are spent only by a button's POST, because mail scanners open links.
+28. **The portal has its own sessions and cookie**, not a role on the admin's. The admin's checks never
+    look at a portal session, so a mistake in the portal can't open the admin, and each can be changed
+    (lifetimes, sign-out everywhere) without touching the other.
+29. **Another client's data answers 404, never 403**, and the only way to it is a query that filters by
+    the signed-in client's id; the pages never receive an id they then have to check.

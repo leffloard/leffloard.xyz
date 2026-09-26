@@ -25,6 +25,8 @@ export type OutboxRef = {
   meetingId?: ObjectId;
   quoteId?: ObjectId;
   invoiceId?: ObjectId;
+  clientId?: ObjectId;
+  projectId?: ObjectId;
 };
 
 export type OutboxDoc = OutboxItem & {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LinksCard, MilestonesCard, ProjectDeleteCard } from "@/components/admin/projects/project-controls";
 import { RevisionMeter } from "@/components/admin/projects/revisions-panel";
+import { ProjectUpdatesCard } from "@/components/admin/projects/updates-card";
 import { DueText } from "@/components/admin/work/due-text";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
@@ -16,7 +17,8 @@ import { requireAdmin } from "@/server/auth/dal";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
 import { getProject, projectNumbers } from "@/server/projects/store";
-import { activities, parseId } from "@/server/work/collections";
+import { updatesForProject } from "@/server/portal/updates";
+import { activities, clients, parseId } from "@/server/work/collections";
 
 export const metadata = { title: "Project" };
 
@@ -43,9 +45,11 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
   if (!project) notFound();
   const at = now();
   const today = todayIn(ADMIN_TIME_ZONE, at);
-  const [numbers, notes] = await Promise.all([
+  const [numbers, notes, updates, owner] = await Promise.all([
     projectNumbers(db, project._id),
     activities(db).find({ projectId: project._id }).sort({ at: -1 }).limit(20).toArray(),
+    updatesForProject(db, project._id, 20),
+    clients(db).findOne({ _id: project.clientId }, { projection: { portal: 1 } }),
   ]);
   const hexId = project._id.toHexString();
   const totalTasks = numbers.tasks.todo + numbers.tasks.doing + numbers.tasks.done;
@@ -185,6 +189,17 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
           }))}
         />
 
+        <ProjectUpdatesCard
+          projectId={hexId}
+          portalOn={owner?.portal?.enabled === true}
+          updates={updates.map((update) => ({
+            id: update._id.toHexString(),
+            body: update.body,
+            when: formatDateTime(update.createdAt),
+            emailed: update.emailed,
+          }))}
+        />
+
         {notes.length ? (
           <Card>
             <CardHeader title="From the client's log" />
@@ -231,7 +246,12 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
         </Card>
         <LinksCard
           projectId={hexId}
-          links={project.links.map((link) => ({ id: link.id, label: link.label, url: link.url }))}
+          links={project.links.map((link) => ({
+            id: link.id,
+            label: link.label,
+            url: link.url,
+            shared: link.shared === true,
+          }))}
         />
         <ProjectDeleteCard id={hexId} reference={project.ref} />
       </div>

@@ -412,4 +412,30 @@ export const migrations: Migration[] = [
       await payments.createIndex({ refundedAt: 1 }, { partialFilterExpression: { status: "refunded" } });
     },
   },
+  {
+    id: "0009",
+    name: "client-portal",
+    async up(db) {
+      // One-time sign-in links and the clients' sessions expire on their own.
+      const links = db.collection("portal_links");
+      await links.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+      await links.createIndex({ clientId: 1 });
+      const sessions = db.collection("portal_sessions");
+      await sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+      await sessions.createIndex({ clientId: 1 });
+
+      const updates = db.collection("project_updates");
+      await updates.createIndex({ projectId: 1, createdAt: -1 });
+      await updates.createIndex({ clientId: 1 });
+
+      // One open request of each kind per client.
+      const requests = db.collection("privacy_requests");
+      await requests.createIndex({ status: 1, createdAt: 1 });
+      await requests.createIndex(
+        { clientId: 1, kind: 1 },
+        { unique: true, name: "one_open_request_per_kind", partialFilterExpression: { status: "open" } },
+      );
+      await db.collection("clients").createIndex({ "portal.enabled": 1, emailKey: 1 });
+    },
+  },
 ];

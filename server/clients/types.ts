@@ -21,6 +21,8 @@ export type ClientDoc = {
   createdAt: Date;
   updatedAt: Date;
   lastContactAt: Date | null;
+  // The client portal: whether they may sign in, when they were invited, when they last did.
+  portal?: { enabled: boolean; invitedAt: Date | null; lastSignInAt: Date | null };
   version: number; // optimistic concurrency for the edit form
 };
 

@@ -8,6 +8,7 @@ import { PUBLIC_ID_PATTERN } from "@/server/billing/public-id";
 import { ANSWER_LIMIT, ANSWER_MESSAGES } from "@/server/billing/public";
 import { acceptQuote, quoteByPublicId } from "@/server/billing/quotes";
 import { getBillingSettings } from "@/server/billing/settings";
+import { getClient } from "@/server/clients/store";
 import { limited, notifyContext } from "@/server/calendar/public";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
@@ -15,6 +16,7 @@ import { getEnv } from "@/server/env";
 import { jsonResponse, readJsonPost } from "@/server/http";
 import { log } from "@/server/log";
 import { sendQueuedSoon } from "@/server/notify/kick";
+import { inviteToPortal } from "@/server/portal/service";
 
 // The client accepts a quote from its link: { version, name, agree: true }.
 //   200 { ok, invoiceUrl }   accepted; the first payment's invoice is at invoiceUrl
@@ -74,6 +76,10 @@ export async function POST(
     const notify = notifyContext();
     await alertQuoteAnswer(db, accepted.quote, "accepted", notify);
     if (accepted.invoice) await emailInvoice(db, accepted.invoice, notify, { again: false, at });
+    // A client who never had the portal gets it, to follow the project from there. One the owner turned it
+    // off for stays without.
+    const client = await getClient(db, accepted.quote.clientId);
+    if (client && client.email && !client.portal) await inviteToPortal(db, client._id, notify, at);
     sendQueuedSoon();
     return jsonResponse({
       ok: true,

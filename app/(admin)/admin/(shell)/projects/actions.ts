@@ -29,7 +29,11 @@ import {
 } from "@/lib/work/options";
 import { adminAction } from "@/server/auth/action";
 import { audit } from "@/server/auth/audit";
+import { notifyContext } from "@/server/calendar/public";
 import { getInquiry } from "@/server/inquiries/store";
+import { sendQueuedSoon } from "@/server/notify/kick";
+import { postProjectUpdate } from "@/server/portal/service";
+import { deleteProjectUpdate } from "@/server/portal/updates";
 import {
   addRevision,
   attachTask,
@@ -49,6 +53,7 @@ import {
   moveProject,
   removeLink,
   removeMilestone,
+  setLinkShared,
   setMilestoneDone,
   updateProject,
   type ProjectInput,
@@ -236,6 +241,52 @@ export const removeLinkAction = adminAction(
       return fail("That link no longer exists.");
     refresh();
     return ok(null, "Link removed.");
+  },
+);
+
+// Shows a link in the client's portal, among the project's deliverables, or hides it.
+export const setLinkSharedAction = adminAction(
+  z.object({ projectId: idSchema, linkId: z.uuid(), shared: z.boolean() }),
+  async (input, { db }) => {
+    if (!(await setLinkShared(db, new ObjectId(input.projectId), input.linkId, input.shared)))
+      return fail("That link no longer exists.");
+    refresh();
+    return ok(null, input.shared ? "Shared in the client's portal." : "No longer shared.");
+  },
+);
+
+// --- Updates for the client -----------------------------------------------------------------------------------
+
+export const postProjectUpdateAction = adminAction(
+  z.object({
+    projectId: idSchema,
+    body: requiredText(4000, "Write the update.", true),
+    email: z.boolean(),
+  }),
+  async (input, { db }) => {
+    const project = await getProject(db, new ObjectId(input.projectId));
+    if (!project) return fail(NOT_FOUND);
+    const { emailed } = await postProjectUpdate(db, project, input.body, input.email, notifyContext());
+    if (emailed) sendQueuedSoon();
+    refresh();
+    return ok(
+      null,
+      input.email && !emailed
+        ? "Posted. It couldn't be emailed: email isn't set up, or the client has no address."
+        : emailed
+          ? "Posted, and emailed to the client."
+          : "Posted in the client's portal.",
+    );
+  },
+);
+
+export const deleteProjectUpdateAction = adminAction(
+  z.object({ projectId: idSchema, id: idSchema }),
+  async (input, { db }) => {
+    if (!(await deleteProjectUpdate(db, new ObjectId(input.projectId), new ObjectId(input.id))))
+      return fail("That update no longer exists.");
+    refresh();
+    return ok(null, "Update removed.");
   },
 );
 

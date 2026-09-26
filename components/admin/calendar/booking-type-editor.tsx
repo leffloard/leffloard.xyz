@@ -27,7 +27,7 @@ export type BookingTypeForm = {
   title: string;
   description: string;
   durationMinutes: number;
-  visibility: "public" | "secret";
+  visibility: "public" | "portal" | "secret";
   requiresApproval: boolean;
   location: "jitsi" | "discord" | "custom";
   locationDetails: string;
@@ -133,7 +133,7 @@ export function BookingTypeEditor({
   }
 
   const field = (name: string) => `${prefix}-${name}`;
-  const secret = initial?.visibility === "secret";
+  const secret = initial?.visibility !== undefined && initial.visibility !== "public";
 
   return (
     <Card>
@@ -144,6 +144,7 @@ export function BookingTypeEditor({
           id ? (
             <span className="flex gap-1.5">
               {form.visibility === "secret" ? <Badge>link only</Badge> : null}
+              {form.visibility === "portal" ? <Badge>clients</Badge> : null}
               <Badge tone={form.active ? "success" : "neutral"}>
                 {form.active ? "taking bookings" : "paused"}
               </Badge>
@@ -177,7 +178,10 @@ export function BookingTypeEditor({
             </div>
             {secret ? (
               <p className="text-xs text-muted">
-                Only people with this link can book. A new link stops the ones you have shared.
+                {initial?.visibility === "portal"
+                  ? "Clients book it from their portal; anyone else needs this link."
+                  : "Only people with this link can book."}{" "}
+                A new link stops the ones you have shared.
               </p>
             ) : null}
           </div>
@@ -257,6 +261,7 @@ export function BookingTypeEditor({
                 onChange={(event) => set("visibility", event.target.value as BookingTypeForm["visibility"])}
               >
                 <option value="public">Anyone: listed on the booking page</option>
+                <option value="portal">Clients: listed in their portal</option>
                 <option value="secret">Only people you send the link to</option>
               </select>
             </FormRow>

@@ -14,6 +14,7 @@ import { markActive, touchClient } from "@/server/clients/store";
 import { now } from "@/server/clock";
 import { rankFor } from "@/server/db/ordering";
 import { inTransaction } from "@/server/db/transaction";
+import { projectUpdates } from "@/server/portal/collections";
 import type { Milestone, ProjectDoc, ProjectLink, RevisionPolicy } from "@/server/projects/types";
 import {
   activities,
@@ -123,11 +124,12 @@ export async function updateProject(
   );
   if (!doc) return { ok: false, reason: "conflict" };
   if (!current.clientId.equals(input.clientId)) {
-    // The project moved to another client: its tasks, rounds and time follow.
+    // The project moved to another client: its tasks, rounds, time and portal updates follow.
     const moved = { projectId: id };
     await tasks(db).updateMany(moved, { $set: { clientId: input.clientId } });
     await revisions(db).updateMany(moved, { $set: { clientId: input.clientId } });
     await timeEntries(db).updateMany(moved, { $set: { clientId: input.clientId } });
+    await projectUpdates(db).updateMany(moved, { $set: { clientId: input.clientId } });
     await markActive(db, input.clientId, at);
   }
   return { ok: true, doc };
@@ -384,6 +386,21 @@ export async function addLink(
   return (await projects(db).countDocuments({ _id: id }, { limit: 1 })) ? "full" : null;
 }
 
+// Shows a link in the client's portal (a deliverable), or hides it again.
+export async function setLinkShared(
+  db: Db,
+  id: ObjectId,
+  linkId: string,
+  shared: boolean,
+  at: Date = now(),
+): Promise<ProjectDoc | null> {
+  return projects(db).findOneAndUpdate(
+    { _id: id, "links.id": linkId },
+    { $set: { "links.$.shared": shared, updatedAt: at } },
+    { returnDocument: "after" },
+  );
+}
+
 export async function removeLink(
   db: Db,
   id: ObjectId,
@@ -436,7 +453,7 @@ export async function projectNumbers(db: Db, id: ObjectId): Promise<ProjectNumbe
 
 // --- Delete ----------------------------------------------------------------------------------------------------
 
-export type DeletedProject = { tasks: number; revisions: number; timeEntries: number };
+export type DeletedProject = { tasks: number; revisions: number; timeEntries: number; updates: number };
 
 // Deletes a project with its tasks, revision rounds and time, all or nothing. Notes in the client's log
 // that mention it stay, without the link.
@@ -448,6 +465,7 @@ export async function deleteProject(db: Db, id: ObjectId): Promise<DeletedProjec
       tasks: (await tasks(db).deleteMany({ projectId: id }, { session })).deletedCount,
       revisions: (await revisions(db).deleteMany({ projectId: id }, { session })).deletedCount,
       timeEntries: (await timeEntries(db).deleteMany({ projectId: id }, { session })).deletedCount,
+      updates: (await projectUpdates(db).deleteMany({ projectId: id }, { session })).deletedCount,
     };
     await activities(db).updateMany({ projectId: id }, { $set: { projectId: null } }, { session });
     await projects(db).deleteOne({ _id: id }, { session });

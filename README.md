@@ -96,9 +96,10 @@ v1 data is only read, never changed.
   gap after each call, the notice you need, how far ahead people can book and a daily limit. Blocks on the
   Calendar page (school, an exam, a trip) keep time free.
 - **Booking types** (**Calendar → Booking types**): length, where the call happens, up to five questions,
-  and two switches: *Only people you send the link to* (for existing clients: copy the link from the type's
-  card; **New link** retires the old one) and *I confirm each booking first*. Requests wait in the Calendar
-  until you confirm or decline them; the sidebar shows how many.
+  who can book it (*Anyone*, listed on `/book`; *Clients*, listed in their portal; or *Only people you send
+  the link to*: copy the link from the type's card, **New link** retires the old one) and *I confirm each
+  booking first*. Requests wait in the Calendar until you confirm or decline them; the sidebar shows how
+  many.
 - **Your own meetings**: **New meeting** on the Calendar or a client's page. It is confirmed at once, and the
   guest can get the invite by email.
 - **In your calendar app**: turn on the calendar feed and subscribe to its address in Google Calendar (Other
@@ -137,6 +138,25 @@ v1 data is only read, never changed.
 - **Expenses**: add what you pay for hosting, software, fees or hardware, with the receipt's number.
 - **Export**: a CSV for your accountant with every payment, refund and expense, in a form Excel opens on a
   Turkish Windows.
+
+### The client portal (`/portal`)
+
+- **Inviting a client**: **Invite to the portal** on the client's page emails them a sign-in link valid for a
+  week (clients who accept a quote are invited by themselves). Later they type their address at
+  `/portal/login` and get a new link, valid for 20 minutes. There are no client passwords.
+- **What they see**: their projects with the steps, your updates and the links you share, their revision
+  rounds, invoices and quotes (paid from the invoice's own page), their calls and the booking types for
+  clients, and their details.
+- **On a project's page**: **Post the update** ("the staging site is up") shows it in their portal, and
+  emails it if you leave the box ticked. Tick **Shared** next to a link to show it to them.
+- **Revision requests** from the portal arrive like the ones you add, marked *from the portal*, with an email
+  and a Discord message. A round past the included ones is only sent after the client agrees to its price.
+- **Data requests**: a client can ask for a copy of their data or its deletion. They show on the client's
+  page (and you get an email). For a copy, send them the file from **Export data**, then mark the request
+  done with a note. For a deletion, **Delete client** is the answer: the request goes with the rest of their
+  data, and the audit log keeps the record. Answer within 30 days.
+- **Turn off** on the client's page closes their portal and signs them out everywhere; **Sign out
+  everywhere** there signs them out but leaves the portal on.
 
 ### Useful commands
 

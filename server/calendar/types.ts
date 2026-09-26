@@ -10,7 +10,9 @@ export type CalendarSettingsDoc = Availability & {
 };
 
 export type LocationKind = "jitsi" | "discord" | "custom";
-export type Visibility = "public" | "secret";
+// public: listed on /book. portal: listed in clients' portals. secret: only through its link. The last two
+// are booked through a link carrying the type's key.
+export type Visibility = "public" | "portal" | "secret";
 
 export type BookingQuestion = { id: string; label: string; required: boolean };
 
@@ -20,7 +22,7 @@ export type BookingTypeDoc = {
   title: string;
   description: string;
   durationMinutes: number;
-  visibility: Visibility; // secret: bookable only through its link, which carries linkKey
+  visibility: Visibility; // portal and secret: bookable only through a link carrying linkKey
   linkKey: string | null; // the secret part of a secret type's link (?key=...); replaced to retire old links
   requiresApproval: boolean;
   location: { kind: LocationKind; details: string };

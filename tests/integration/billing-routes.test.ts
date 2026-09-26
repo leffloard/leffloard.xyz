@@ -11,6 +11,8 @@ import { resetClock, setClock } from "@/server/clock";
 import { closeClient } from "@/server/db/client";
 import { runMigrations } from "@/server/db/migrate";
 import type { OutboxDoc } from "@/server/notify/outbox";
+import { setPortalAccess } from "@/server/portal/access";
+import { clients } from "@/server/work/collections";
 import { clientInput } from "../helpers/work";
 import { setupTestDb } from "./db";
 import { setupTestEnv } from "./env";
@@ -154,9 +156,11 @@ describe("answering a quote from its link", () => {
     });
 
     const sent = await outbox();
+    // The owner is told, the first invoice goes out, and the new client is invited to their portal.
     expect(sent.map((item) => item.label)).toEqual([
       "Quote accepted: Q-2026-0001",
       "Payment request INV-2026-0001 to Ada Lovelace",
+      "Portal invitation to Ada Lovelace",
     ]);
     const email = sent[1]!.payload as { subject: string; text: string; to: { address: string }[] };
     expect(email.to[0]?.address).toBe("ada@example.com");
@@ -166,6 +170,18 @@ describe("answering a quote from its link", () => {
     const again = await accept(post(path, { version: 2, name: "Ada", agree: true }), params(quote.publicId));
     expect(again.status).toBe(409);
     expect((await again.json()).problem).toBe("answered");
+  });
+
+  it("leaves the portal off for a client the owner turned it off for", async () => {
+    const quote = await sentQuote();
+    await setPortalAccess(db(), quote.clientId, false, NOW);
+    const response = await accept(
+      post(`/api/quotes/${quote.publicId}/accept`, { version: 2, name: "Ada Lovelace", agree: true }),
+      params(quote.publicId),
+    );
+    expect(response.status).toBe(200);
+    expect((await outbox()).map((item) => item.label)).not.toContain("Portal invitation to Ada Lovelace");
+    expect((await clients(db()).findOne({ _id: quote.clientId }))?.portal?.enabled).toBe(false);
   });
 
   it("declines with a reason for the owner", async () => {

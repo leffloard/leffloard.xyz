@@ -8,6 +8,7 @@ import {
   moveProjectAction,
   removeLinkAction,
   removeMilestoneAction,
+  setLinkSharedAction,
   setMilestoneDoneAction,
 } from "@/app/(admin)/admin/(shell)/projects/actions";
 import { useActionRunner } from "@/components/admin/use-action-runner";
@@ -152,7 +153,48 @@ export function MilestonesCard({ projectId, milestones }: { projectId: string; m
   );
 }
 
-export type LinkRow = { id: string; label: string; url: string };
+export type LinkRow = { id: string; label: string; url: string; shared: boolean };
+
+// Shows a link in the client's portal. Ticks at once, and goes back if saving fails.
+function SharedToggle({
+  projectId,
+  link,
+  run,
+  busy,
+}: {
+  projectId: string;
+  link: LinkRow;
+  run: ReturnType<typeof useActionRunner>["run"];
+  busy: boolean;
+}) {
+  const [shared, setShared] = useState(link.shared);
+  const [saved, setSaved] = useState(link.shared);
+  if (link.shared !== saved) {
+    setSaved(link.shared);
+    setShared(link.shared);
+  }
+  return (
+    <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted">
+      <input
+        type="checkbox"
+        checked={shared}
+        disabled={busy}
+        onChange={async (event) => {
+          const next = event.target.checked;
+          setShared(next);
+          const result = await run(`share-${link.id}`, () =>
+            setLinkSharedAction({ projectId, linkId: link.id, shared: next }),
+          );
+          if (!result.ok) setShared(!next);
+        }}
+        className="accent-[var(--color-accent)]"
+      />
+      <span>
+        Shared<span className="sr-only"> with the client: {link.label}</span>
+      </span>
+    </label>
+  );
+}
 
 export function LinksCard({ projectId, links }: { projectId: string; links: LinkRow[] }) {
   const { run, pending, message } = useActionRunner();
@@ -172,9 +214,12 @@ export function LinksCard({ projectId, links }: { projectId: string; links: Link
 
   return (
     <Card>
-      <CardHeader title="Links" description="Repository, staging, production, designs." />
+      <CardHeader
+        title="Links"
+        description="Repository, staging, production, designs. Shared ones show in the client's portal."
+      />
       <CardBody className="grid gap-3 text-[13px]">
-        {message?.tone === "error" ? <Notice tone="error">{message.text}</Notice> : null}
+        {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
         {links.length ? (
           <ul className="grid gap-1.5">
             {links.map((link) => (
@@ -188,6 +233,12 @@ export function LinksCard({ projectId, links }: { projectId: string; links: Link
                   {link.label}
                   <span className="ml-2 text-xs text-muted">{new URL(link.url).host}</span>
                 </a>
+                <SharedToggle
+                  projectId={projectId}
+                  link={link}
+                  run={run}
+                  busy={pending === `share-${link.id}`}
+                />
                 <button
                   type="button"
                   className="shrink-0 text-xs text-muted hover:text-danger"

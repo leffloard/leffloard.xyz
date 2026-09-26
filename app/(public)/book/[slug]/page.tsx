@@ -30,7 +30,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     title: `Book: ${type.title}`,
     description: type.description || "Pick a time for a call, in your own time zone.",
     // A secret type is shared by link only.
-    robots: type.visibility === "secret" ? { index: false, follow: false } : undefined,
+    robots: type.visibility !== "public" ? { index: false, follow: false } : undefined,
     alternates: type.visibility === "public" ? { canonical: `/book/${type.slug}` } : undefined,
   };
 }
@@ -56,7 +56,7 @@ export default async function BookTypePage(props: Props) {
             <BookingFlow
               type={{
                 slug: type.slug,
-                linkKey: type.visibility === "secret" ? type.linkKey : null,
+                linkKey: type.visibility !== "public" ? type.linkKey : null,
                 title: type.title,
                 durationMinutes: type.durationMinutes,
                 requiresApproval: type.requiresApproval,

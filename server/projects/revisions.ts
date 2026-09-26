@@ -1,5 +1,6 @@
 import "server-only";
 import { ObjectId, type Db } from "mongodb";
+import type { Money } from "@/lib/money";
 import type { RevisionStatus } from "@/lib/work/options";
 import { now } from "@/server/clock";
 import { inTransaction } from "@/server/db/transaction";
@@ -15,7 +16,22 @@ export type NewRevision = {
   details: string;
   inquiryId?: ObjectId | null;
   requestedAt?: Date;
+  // Asked for by the client in their portal. A round that turns out billable is written only if they agreed
+  // to the extra-round price as it is now (the count or the price may have changed since their page loaded).
+  fromPortal?: { chargeAgreed: boolean; agreedPrice: Money | null };
 };
+
+function samePrice(a: Money | null, b: Money | null): boolean {
+  return a === null || b === null ? a === b : a.amountMinor === b.amountMinor && a.currency === b.currency;
+}
+
+// A round the client would have to pay for, but didn't agree to.
+export class RevisionChargeError extends Error {
+  constructor(readonly price: Money | null) {
+    super("This round is beyond the included ones.");
+    this.name = "RevisionChargeError";
+  }
+}
 
 export async function addRevision(
   db: Db,
@@ -35,6 +51,14 @@ export async function addRevision(
     );
     if (!project) return null;
     const billable = project.revisionsUsed > project.revisionPolicy.included;
+    const { extraPrice } = project.revisionPolicy;
+    if (
+      billable &&
+      input.fromPortal &&
+      !(input.fromPortal.chargeAgreed && samePrice(input.fromPortal.agreedPrice, extraPrice))
+    ) {
+      throw new RevisionChargeError(extraPrice);
+    }
     const revision: RevisionDoc = {
       _id: new ObjectId(),
       projectId,
@@ -46,6 +70,7 @@ export async function addRevision(
       billable,
       price: billable ? project.revisionPolicy.extraPrice : null,
       inquiryId: input.inquiryId ?? null,
+      ...(input.fromPortal ? { fromPortal: true } : {}),
       taskId: null,
       requestedAt: input.requestedAt ?? at,
       completedAt: null,

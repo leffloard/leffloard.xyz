@@ -32,6 +32,7 @@ export function SiteFooter() {
               { href: "/cv", label: "CV" },
               { href: "/contact", label: "Contact" },
               { href: "/book", label: "Book a call" },
+              { href: "/portal", label: "Client portal" },
             ].map((item) => (
               <li key={item.href}>
                 <Link href={item.href} className="text-ink/80 hover:text-ink">

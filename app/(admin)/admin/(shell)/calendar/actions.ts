@@ -358,7 +358,7 @@ const bookingTypeFields = z.object({
   title: requiredText(80, "Name the call."),
   description: notesText(500),
   durationMinutes: oneOf(DURATIONS, "Choose a length from the list."),
-  visibility: z.enum(["public", "secret"]),
+  visibility: z.enum(["public", "portal", "secret"]),
   requiresApproval: z.boolean(),
   location: z.enum(["jitsi", "discord", "custom"]),
   locationDetails: notesText(300),

@@ -6,6 +6,7 @@ import {
   ClientStatusSelect,
   DeleteActivityButton,
 } from "@/components/admin/clients/client-controls";
+import { PortalCard, PrivacyRequestsCard } from "@/components/admin/clients/portal-card";
 import { PageHeader } from "@/components/admin/shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
@@ -20,6 +21,8 @@ import { requireAdmin } from "@/server/auth/dal";
 import { clientTimeline, getClient, type TimelineEntry } from "@/server/clients/store";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
+import { activePortalSessions } from "@/server/portal/access";
+import { privacyRequestsFor } from "@/server/portal/privacy";
 import { projectsForClient, trackedTime } from "@/server/projects/store";
 import { parseId } from "@/server/work/collections";
 
@@ -128,11 +131,17 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const client = id ? await getClient(db, id) : null;
   if (!client) notFound();
   const at = now();
-  const [projects, timeline, time] = await Promise.all([
+  const [projects, timeline, time, sessions, requests] = await Promise.all([
     projectsForClient(db, client._id),
     clientTimeline(db, client._id),
     trackedTime(db, { clientId: client._id }),
+    activePortalSessions(db, client._id, at),
+    privacyRequestsFor(db, client._id),
   ]);
+  const portalFacts = [
+    client.portal?.invitedAt ? `Invited ${formatDate(client.portal.invitedAt)}` : null,
+    client.portal?.lastSignInAt ? `Last signed in ${formatDateTime(client.portal.lastSignInAt)}` : null,
+  ].filter((fact): fact is string => fact !== null);
   const hexId = client._id.toHexString();
 
   const details: [string, React.ReactNode][] = [];
@@ -318,6 +327,22 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               ) : null}
             </CardBody>
           </Card>
+          <PortalCard
+            id={hexId}
+            enabled={client.portal?.enabled === true}
+            hasEmail={client.email !== null}
+            facts={portalFacts}
+            sessions={sessions}
+          />
+          <PrivacyRequestsCard
+            rows={requests.map((request) => ({
+              id: request._id.toHexString(),
+              kind: request.kind,
+              note: request.note,
+              when: formatDateTime(request.createdAt),
+              status: request.status,
+            }))}
+          />
           <ClientPrivacyCard id={hexId} name={client.name} />
         </div>
       </div>

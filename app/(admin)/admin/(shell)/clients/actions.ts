@@ -40,7 +40,12 @@ import {
   updateClient,
 } from "@/server/clients/store";
 import { now } from "@/server/clock";
+import { notifyContext } from "@/server/calendar/public";
 import { getInquiry } from "@/server/inquiries/store";
+import { sendQueuedSoon } from "@/server/notify/kick";
+import { endClientSessions, setPortalAccess } from "@/server/portal/access";
+import { resolvePrivacyRequest } from "@/server/portal/privacy";
+import { inviteToPortal } from "@/server/portal/service";
 
 const NOT_FOUND = "This client no longer exists.";
 const CONFLICT = "This client was changed somewhere else since you opened the form. Reload to see it.";
@@ -217,4 +222,51 @@ export const deleteClientAction = adminAction(
     redirect("/admin/clients");
   },
   { sudo: true },
+);
+
+// --- The client portal ------------------------------------------------------------------------------------------
+
+// Turns the portal on and emails the client a link that works for a week.
+export const inviteToPortalAction = adminAction(z.object({ id: idSchema }), async (input, { db }) => {
+  const result = await inviteToPortal(db, new ObjectId(input.id), notifyContext());
+  if (!result.ok) return fail(result.message);
+  if (result.emailed) sendQueuedSoon();
+  refresh();
+  return ok(
+    null,
+    result.emailed
+      ? `Invitation sent to ${result.client.email}.`
+      : "The portal is on, but email isn't set up, so the invitation couldn't be sent.",
+  );
+});
+
+// Turning the portal off signs the client out everywhere.
+export const setPortalAccessAction = adminAction(
+  z.object({ id: idSchema, enabled: z.boolean() }),
+  async (input, { db }) => {
+    if (!(await setPortalAccess(db, new ObjectId(input.id), input.enabled))) return fail(NOT_FOUND);
+    refresh();
+    return ok(null, input.enabled ? "The portal is on." : "The portal is off, and the client is signed out.");
+  },
+);
+
+export const endPortalSessionsAction = adminAction(z.object({ id: idSchema }), async (input, { db }) => {
+  const count = await endClientSessions(db, new ObjectId(input.id));
+  refresh();
+  return ok(null, count ? "Signed out everywhere." : "The client wasn't signed in anywhere.");
+});
+
+// A data request answered: done (the copy sent, the data deleted) or declined, with a note for the record.
+export const resolvePrivacyRequestAction = adminAction(
+  z.object({
+    id: idSchema,
+    status: z.enum(["done", "declined"]),
+    resolution: text({ maxLength: 500 }).transform((value) => value ?? ""),
+  }),
+  async (input, { db }) => {
+    const resolved = await resolvePrivacyRequest(db, new ObjectId(input.id), input.status, input.resolution);
+    if (!resolved) return fail("This request was already answered.");
+    refresh();
+    return ok(null, input.status === "done" ? "Marked as done." : "Marked as declined.");
+  },
 );

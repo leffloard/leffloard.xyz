@@ -1,4 +1,6 @@
 import "server-only";
+import { invoices, payments, quotes } from "@/server/billing/collections";
+import { portalLinks, portalSessions, privacyRequests, projectUpdates } from "@/server/portal/collections";
 import { ObjectId, type ClientSession, type Db, type Document, type Filter } from "mongodb";
 import type { InquiryKind } from "@/lib/intake/options";
 import { DEFAULT_CURRENCY, type Currency } from "@/lib/money";
@@ -471,7 +473,19 @@ export async function exportClient(db: Db, clientId: ObjectId, at: Date = now())
   const inProject = {
     $or: [{ clientId }, { projectId: { $in: projectDocs.map((project) => project._id) } }],
   };
-  const [revisionDocs, taskDocs, timeDocs, activityDocs, messageDocs, meetingDocs] = await Promise.all([
+  const [
+    revisionDocs,
+    taskDocs,
+    timeDocs,
+    activityDocs,
+    messageDocs,
+    meetingDocs,
+    updateDocs,
+    requestDocs,
+    sessionDocs,
+    quoteDocs,
+    invoiceDocs,
+  ] = await Promise.all([
     revisions(db).find(inProject).sort({ requestedAt: 1 }).toArray(),
     tasks(db)
       .find(inProject, { projection: { rank: 0 } })
@@ -488,7 +502,26 @@ export async function exportClient(db: Db, clientId: ObjectId, at: Date = now())
       .find({ clientId }, { projection: { manageTokenHash: 0, manageTokenSealed: 0, purgeAt: 0 } })
       .sort({ startsAt: 1 })
       .toArray(),
+    projectUpdates(db).find(inProject).sort({ createdAt: 1 }).toArray(),
+    privacyRequests(db).find({ clientId }).sort({ createdAt: 1 }).toArray(),
+    // Where they are signed in to the portal, without the sessions' keys.
+    portalSessions(db)
+      .find({ clientId }, { projection: { _id: 0, clientId: 0 } })
+      .sort({ createdAt: 1 })
+      .toArray(),
+    quotes(db)
+      .find({ clientId, status: { $ne: "draft" } }, { projection: { publicId: 0 } })
+      .sort({ createdAt: 1 })
+      .toArray(),
+    invoices(db)
+      .find({ clientId, status: { $ne: "draft" } }, { projection: { publicId: 0 } })
+      .sort({ createdAt: 1 })
+      .toArray(),
   ]);
+  const paymentDocs = await payments(db)
+    .find({ invoiceId: { $in: invoiceDocs.map((invoice) => invoice._id) } }, { projection: { provider: 0 } })
+    .sort({ createdAt: 1 })
+    .toArray();
   return {
     exportedAt: at.toISOString(),
     client,
@@ -499,6 +532,12 @@ export async function exportClient(db: Db, clientId: ObjectId, at: Date = now())
     log: activityDocs,
     messages: messageDocs,
     meetings: meetingDocs,
+    projectUpdates: updateDocs,
+    dataRequests: requestDocs,
+    portalSessions: sessionDocs,
+    quotes: quoteDocs,
+    invoices: invoiceDocs,
+    payments: paymentDocs,
   };
 }
 
@@ -510,10 +549,13 @@ export type DeletedClient = {
   log: number;
   messagesUnlinked: number;
   meetingsUnlinked: number;
+  portal: number; // sessions, sign-in links and project updates
+  dataRequests: number; // answered by this deletion; the audit log keeps the record
 };
 
-// Deletes a client with their projects, revision rounds, tasks, time and log, all or nothing. Their
-// inbox messages and meetings stay (they follow their own retention) but are no longer linked.
+// Deletes a client with their projects, revision rounds, tasks, time, log and portal, all or nothing. Their
+// inbox messages and meetings stay (they follow their own retention) but are no longer linked; quotes,
+// invoices and payments stay as tax law requires.
 export async function deleteClient(db: Db, clientId: ObjectId): Promise<DeletedClient | null> {
   return inTransaction(db, async (session) => {
     const client = await clients(db).findOne({ _id: clientId }, { session, projection: { _id: 1 } });
@@ -536,6 +578,11 @@ export async function deleteClient(db: Db, clientId: ObjectId): Promise<DeletedC
       meetingsUnlinked: (
         await meetings(db).updateMany({ clientId }, { $set: { clientId: null } }, { session })
       ).modifiedCount,
+      portal:
+        (await portalSessions(db).deleteMany({ clientId }, { session })).deletedCount +
+        (await portalLinks(db).deleteMany({ clientId }, { session })).deletedCount +
+        (await projectUpdates(db).deleteMany(inProject, { session })).deletedCount,
+      dataRequests: (await privacyRequests(db).deleteMany({ clientId }, { session })).deletedCount,
     };
     await clients(db).deleteOne({ _id: clientId }, { session });
     return deleted;

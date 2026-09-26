@@ -41,9 +41,14 @@ export function newLinkKey(): string {
   return randomBytes(16).toString("base64url");
 }
 
-// "/book/project-check-in?key=…": a secret type's link carries its key.
+// Types not listed publicly (for clients' portals, or link only) are booked through a link with their key.
+export function keyed(visibility: BookingTypeDoc["visibility"]): boolean {
+  return visibility !== "public";
+}
+
+// "/book/project-check-in?key=…": a keyed type's link carries its key.
 export function bookingPath(type: Pick<BookingTypeDoc, "slug" | "visibility" | "linkKey">): string {
-  const key = type.visibility === "secret" && type.linkKey ? `?key=${type.linkKey}` : "";
+  const key = keyed(type.visibility) && type.linkKey ? `?key=${type.linkKey}` : "";
   return `/book/${type.slug}${key}`;
 }
 
@@ -80,7 +85,7 @@ export async function createBookingType(
     _id: new ObjectId(),
     ...input,
     questions: questionsOf(input.questions),
-    linkKey: input.visibility === "secret" ? newLinkKey() : null,
+    linkKey: keyed(input.visibility) ? newLinkKey() : null,
     rank: rankBetween(last?.rank ?? null, null),
     createdAt: at,
     updatedAt: at,
@@ -109,8 +114,8 @@ export async function updateBookingType(
         $set: {
           ...input,
           questions: questionsOf(input.questions, current.questions),
-          // A type made secret gets a key; one that already has a key keeps it, so its link keeps working.
-          linkKey: current.linkKey ?? (input.visibility === "secret" ? newLinkKey() : null),
+          // A type no longer public gets a key; one that already has a key keeps it, so its link keeps working.
+          linkKey: current.linkKey ?? (keyed(input.visibility) ? newLinkKey() : null),
           updatedAt: at,
         },
       },

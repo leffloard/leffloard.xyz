@@ -10,7 +10,9 @@ export type Milestone = {
   doneAt: Date | null;
 };
 
-export type ProjectLink = { id: string; label: string; url: string };
+// A link on a project (a staging site, a repository, a delivered file). Shared links show in the client's
+// portal as deliverables.
+export type ProjectLink = { id: string; label: string; url: string; shared?: boolean };
 
 export type RevisionPolicy = {
   included: number; // revision rounds included in the price
@@ -58,6 +60,7 @@ export type RevisionDoc = {
   billable: boolean; // beyond the included rounds
   price: Money | null; // the extra-round price when it was requested
   inquiryId: ObjectId | null;
+  fromPortal?: boolean; // asked for by the client in their portal
   taskId: ObjectId | null;
   requestedAt: Date;
   completedAt: Date | null;

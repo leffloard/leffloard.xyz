@@ -23,6 +23,8 @@ import {
 export const EXCLUDED_COLLECTIONS: ReadonlySet<string> = new Set([
   "sessions",
   "auth_tokens",
+  "portal_sessions",
+  "portal_links",
   "rate_limits",
   "login_lockouts",
   "idempotency_keys",
