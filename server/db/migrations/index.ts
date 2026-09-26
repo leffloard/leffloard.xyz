@@ -37,4 +37,12 @@ export const migrations: Migration[] = [
         .createIndex({ receivedAt: 1 }, { expireAfterSeconds: 30 * 24 * 3600 });
     },
   },
+  {
+    id: "0003",
+    name: "audit-log-retention",
+    // Security logs are kept for 12 months (see the privacy notice).
+    async up(db) {
+      await db.collection("audit_log").createIndex({ at: 1 }, { expireAfterSeconds: 365 * 24 * 3600 });
+    },
+  },
 ];

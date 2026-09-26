@@ -27,6 +27,15 @@ const nextConfig: NextConfig = {
     // forbidden() for requests that Cloudflare Access did not let through.
     authInterrupts: true,
   },
+  // Packages that load files at runtime (fonts, grammars) stay outside the server bundle.
+  serverExternalPackages: ["@react-pdf/renderer", "shiki", "@shikijs/rehype"],
+  async redirects() {
+    return [
+      // v1 addresses: the request form opened with ?type=..., and four template blog posts.
+      { source: "/", has: [{ type: "query", key: "type" }], destination: "/contact", permanent: false },
+      { source: "/blog/:id(\\d+)", destination: "/blog", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

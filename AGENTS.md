@@ -46,3 +46,5 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
 - Every change comes with tests. Unit tests need no database; integration tests use the throwaway replica set
   from `tests/integration/global-setup.ts`.
 - Content scope: no case studies, marketing copy or pricing for game-modification projects or cheat loaders.
+- Public content (`content/`) states only verifiable facts. Private projects never link to their code and
+  never name customers, amounts, domains or ids. `tests/unit/content.test.ts` enforces the checkable parts.

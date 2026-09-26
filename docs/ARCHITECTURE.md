@@ -5,13 +5,15 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M1, security core and admin shell**.
+This document grows with each milestone. Current state: **M2, design system and public site**.
 
 ## Layout
 
 ```text
 app/                      Routes (App Router)
-  (public)/               Public site, with its own root layout
+  (public)/               Public site, with its own root layout: home, work, services, pricing, about, cv,
+                          blog, contact, legal pages, colophon; OG images, cv.pdf and the RSS feed
+  sitemap.ts, robots.ts   Machine-readable files (plus manifest.ts and .well-known/security.txt)
   (admin)/admin/          Admin, with its own root layout (dynamic, noindex)
     login/, setup/        Sign-in, two-step check, first-time authenticator setup
     (shell)/              Signed-in pages: Today, Security
@@ -19,7 +21,8 @@ app/                      Routes (App Router)
   api/csp-report/route.ts Receives Content Security Policy violation reports
   global-not-found.tsx    404 page for every unmatched address
   globals.css             Tailwind 4 entry and design tokens
-components/               UI: ui/ (buttons, fields, cards) and admin/
+components/               UI: ui/ (buttons, fields, cards), site/ (public site) and admin/
+content/                  Public site content until the CMS (M9): site facts, work, services, CV, blog posts
 lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, CSP builder, formatting
 server/                   Server-only code (every file imports "server-only")
   env.ts                  Validated configuration, plain-English errors
@@ -29,6 +32,7 @@ server/                   Server-only code (every file imports "server-only")
   health.ts               Deep health logic and constant-time token check
   http.ts                 Size-limited request body reading
   auth/                   Owner account, sessions, sign-in steps, passkeys, audit log, admin action wrapper
+  content/                Blog rendering (Markdown pipeline), OG image and CV PDF generation
   security/               Password hashing, encryption, rate limits, lockouts, Turnstile, Access, CSRF, NoSQL guard
   db/client.ts            One MongoClient per process
   db/migrate.ts           Migration runner with a database lock
@@ -149,6 +153,45 @@ location, payment, USB and topics, and HSTS in production. `X-Powered-By` is off
 | Forgot the password                 | On the server: `npm run admin -- reset-password`.                                             |
 | Locked out by someone guessing      | Wait, use a passkey, or `npm run admin -- unlock`.                                            |
 
+## Public site
+
+### Content
+
+Until the CMS arrives (M9), the public site's content lives in `content/`: `site.ts` (contact details,
+availability), `work.ts` (portfolio), `services.ts` (packages, prices, terms), `cv.ts` and `blog/*.md`.
+Everything is generated at build time; no public page touches the database.
+
+The content follows fixed rules, checked by `tests/unit/content.test.ts` on every change:
+
+- Only verifiable facts. Private projects are described from a facts sheet (purpose, capabilities,
+  architecture, practices, stack) and never link to their code; public repositories do.
+- No phone numbers, template leftovers, Discord ids, webhook URLs or keys anywhere in `content/`.
+- No case studies, marketing copy or pricing for game-modification projects or cheat loaders.
+
+Blog posts are Markdown with a small frontmatter (`title`, `description`, `date`, `tags`). They are
+rendered with remark and rehype, sanitised (scripts, event handlers, `javascript:` links and iframes are
+removed), then highlighted by Shiki in both a light and a dark theme.
+
+### Design system
+
+"Engineering drawing": a near-black canvas (or near-white, following the system theme), hairline frame
+lines at the edges of the content column, "+" marks where sections meet the frame, monospace annotations
+("01 / Work"), one cyan accent and large Geist Sans headings. Colour tokens are CSS variables in
+`app/globals.css`; every text/background pair meets WCAG AA in both themes (the lowest is 4.9:1).
+
+Motion is limited to opacity and transform: headings rise on load, sections reveal with CSS scroll-driven
+animations, cards light up around the pointer. With reduced motion nothing moves. The home page's contour
+field is a WebGL2 shader (`components/site/signal-field.tsx`) that starts when the browser is idle, stays
+off with reduced motion or Save-Data, pauses off-screen, and is not needed for the page to be complete.
+
+### Search engines and sharing
+
+Every page has a title, description and canonical URL on `https://leffloard.xyz`. Social previews are
+generated images in the site's style (`opengraph-image.tsx`, per case study and post). The site publishes
+`sitemap.xml`, `robots.txt` (the admin and link pages are excluded), an RSS feed, a web manifest,
+`/.well-known/security.txt` and Person / BlogPosting structured data. Old v1 addresses redirect: the request
+form (`/?type=…`) to `/contact`, and the template blog posts to `/blog`.
+
 ## Testing
 
 | Suite       | Command                             | Needs                                                   |
@@ -162,6 +205,7 @@ location, payment, USB and topics, and HSTS in production. `X-Powered-By` is off
 - End-to-end tests start `scripts/e2e-server.ts`: a throwaway database with migrations applied and the
   standalone build started exactly as production starts it. Any console error or failed request on a page
   fails the test.
+- Every public page is checked with axe (WCAG 2.2 AA) in both themes, and for horizontal overflow at 360px.
 - Offline machines can use local binaries: `MONGOMS_SYSTEM_BINARY=/path/to/mongod`,
   `PW_CHROMIUM_PATH=/path/to/chrome`.
 
@@ -181,28 +225,32 @@ Dependabot proposes npm and GitHub Actions updates weekly; `next`, `react` and t
 
 Every direct dependency and why it is here.
 
-| Package                                             | Why                                                                                                                   |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `next` (pinned)                                     | Framework: App Router, route handlers, standalone output. Pinned exactly so security releases are applied on purpose. |
-| `react`, `react-dom` (pinned)                       | The versions this Next.js release is tested with.                                                                     |
-| `mongodb`                                           | Official driver; transactions, explicit queries, no ORM layer.                                                        |
-| `zod`                                               | Validation of configuration and every input; one schema for client and server.                                        |
-| `pino`                                              | Fast structured logs with redaction.                                                                                  |
-| `geist`                                             | Geist Sans and Mono, self-hosted through `next/font` (no third-party font requests).                                  |
-| `server-only`                                       | Build error if server code is imported into a client component.                                                       |
-| `typescript`, `@types/*`                            | Strict types (`strict`, `noUncheckedIndexedAccess`).                                                                  |
-| `eslint`, `eslint-config-next`                      | Next.js, React and TypeScript lint rules.                                                                             |
-| `prettier`, `prettier-plugin-tailwindcss`           | One formatting style; sorted class names.                                                                             |
-| `tailwindcss`, `@tailwindcss/postcss`               | Styling. Only `app/` and `components/` are scanned, never `frontend/`.                                                |
-| `vitest`                                            | Unit and integration tests.                                                                                           |
-| `mongodb-memory-server`                             | Real `mongod` replica sets for development and tests, on Windows and Linux, without Docker.                           |
-| `@playwright/test`                                  | End-to-end browser tests.                                                                                             |
-| `tsx`                                               | Runs the TypeScript scripts in `scripts/`.                                                                            |
-| `@next/env`                                         | Loads `.env*` files in scripts exactly like Next.js does.                                                             |
-| `@node-rs/argon2`                                   | argon2id password hashing with prebuilt binaries for Windows and Linux (no compiler needed).                          |
-| `@simplewebauthn/server`, `@simplewebauthn/browser` | Passkeys: the WebAuthn ceremonies and their verification.                                                             |
-| `jose`                                              | Verifies the Cloudflare Access JWT against Access's published keys.                                                   |
-| `qrcode`                                            | The QR code for setting up the authenticator app, rendered on the server as SVG.                                      |
+| Package                                                                                         | Why                                                                                                                   |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `next` (pinned)                                                                                 | Framework: App Router, route handlers, standalone output. Pinned exactly so security releases are applied on purpose. |
+| `react`, `react-dom` (pinned)                                                                   | The versions this Next.js release is tested with.                                                                     |
+| `mongodb`                                                                                       | Official driver; transactions, explicit queries, no ORM layer.                                                        |
+| `zod`                                                                                           | Validation of configuration and every input; one schema for client and server.                                        |
+| `pino`                                                                                          | Fast structured logs with redaction.                                                                                  |
+| `geist`                                                                                         | Geist Sans and Mono, self-hosted through `next/font` (no third-party font requests).                                  |
+| `server-only`                                                                                   | Build error if server code is imported into a client component.                                                       |
+| `typescript`, `@types/*`                                                                        | Strict types (`strict`, `noUncheckedIndexedAccess`).                                                                  |
+| `eslint`, `eslint-config-next`                                                                  | Next.js, React and TypeScript lint rules.                                                                             |
+| `prettier`, `prettier-plugin-tailwindcss`                                                       | One formatting style; sorted class names.                                                                             |
+| `tailwindcss`, `@tailwindcss/postcss`                                                           | Styling. Only `app/` and `components/` are scanned, never `frontend/`.                                                |
+| `vitest`                                                                                        | Unit and integration tests.                                                                                           |
+| `mongodb-memory-server`                                                                         | Real `mongod` replica sets for development and tests, on Windows and Linux, without Docker.                           |
+| `@playwright/test`                                                                              | End-to-end browser tests.                                                                                             |
+| `tsx`                                                                                           | Runs the TypeScript scripts in `scripts/`.                                                                            |
+| `@next/env`                                                                                     | Loads `.env*` files in scripts exactly like Next.js does.                                                             |
+| `@node-rs/argon2`                                                                               | argon2id password hashing with prebuilt binaries for Windows and Linux (no compiler needed).                          |
+| `@simplewebauthn/server`, `@simplewebauthn/browser`                                             | Passkeys: the WebAuthn ceremonies and their verification.                                                             |
+| `jose`                                                                                          | Verifies the Cloudflare Access JWT against Access's published keys.                                                   |
+| `qrcode`                                                                                        | The QR code for setting up the authenticator app, rendered on the server as SVG.                                      |
+| `unified`, `remark-parse`, `remark-gfm`, `remark-rehype`, `rehype-sanitize`, `rehype-stringify` | The Markdown pipeline for blog posts, with sanitising before anything is published.                                   |
+| `shiki`, `@shikijs/rehype`                                                                      | Code highlighting at build time, in a light and a dark theme, with no JavaScript sent to the browser.                 |
+| `@react-pdf/renderer`                                                                           | Generates `/cv.pdf` from the same data as the CV page.                                                                |
+| `@axe-core/playwright`                                                                          | Accessibility checks (WCAG 2.2 AA) in the browser tests.                                                              |
 
 ## Decisions
 
@@ -222,3 +270,7 @@ Every direct dependency and why it is here.
    server at once; the cookie holds only a random token.
 8. **TOTP implemented in `lib/totp.ts`** (about 60 lines, tested against the RFC 6238 vectors) instead of a
    dependency, because it is small, stable and security-critical enough to be read in full.
+9. **Content in code before the CMS.** The public site needed real content before the admin can edit it;
+   typed files in `content/` are reviewed like code and move into the database in M9.
+10. **No third-party scripts on public pages** (fonts are self-hosted, no analytics tags); Cloudflare
+    Turnstile on forms is the only exception.

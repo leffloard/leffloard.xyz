@@ -21,6 +21,22 @@ downloaded on the first start (about 100 MB).
 Development never touches the production Atlas database. The local data lives in `.data/dev-db`; delete that
 folder to start empty.
 
+### Editing the public site
+
+Until the admin's content editor arrives, the site's text lives in `content/`:
+
+| File | What it holds |
+| --- | --- |
+| `content/site.ts` | Name, email, location, availability badge ("Taking new projects") |
+| `content/work.ts` | Portfolio projects and their case studies |
+| `content/services.ts` | Services, packages, prices, payment terms and FAQ |
+| `content/cv.ts` | The CV (also used for `/cv.pdf`) |
+| `content/blog/*.md` | Blog posts (Markdown with `title`, `description`, `date`, `tags` at the top) |
+
+Your photo: save it as `public/images/profile.jpg` (portrait, about 1200 × 1500) and rebuild; until then the
+About page shows your initials. `npm run test:unit` checks the content for broken links between projects,
+phone numbers and other things that must not be published.
+
 ### The admin (`/admin`)
 
 1. Create the owner account once, in a terminal on the machine that runs the site:

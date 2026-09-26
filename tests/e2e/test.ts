@@ -4,7 +4,7 @@ export { expect };
 
 // Collects console errors (CSP violations included), uncaught exceptions and failed requests, and fails
 // the test if any show up. Pages from extra contexts join in with watchPage().
-type Fixtures = { allowedErrors: RegExp[]; browserErrors: string[] };
+type Fixtures = { allowedErrors: RegExp | null; browserErrors: string[] };
 
 export function watchPage(page: Page, errors: string[]): void {
   page.on("console", (message) => {
@@ -17,13 +17,13 @@ export function watchPage(page: Page, errors: string[]): void {
 }
 
 export const test = base.extend<Fixtures>({
-  allowedErrors: [[], { option: true }],
+  allowedErrors: [null, { option: true }],
   browserErrors: [
     async ({ page, allowedErrors }, use) => {
       const errors: string[] = [];
       watchPage(page, errors);
       await use(errors);
-      expect(errors.filter((error) => !allowedErrors.some((pattern) => pattern.test(error)))).toEqual([]);
+      expect(errors.filter((error) => !allowedErrors?.test(error))).toEqual([]);
     },
     { auto: true },
   ],
