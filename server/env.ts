@@ -1,4 +1,5 @@
 import "server-only";
+import path from "node:path";
 import { z } from "zod";
 
 // Variables that only the v1 FastAPI backend read. They are harmless but ignored here.
@@ -51,6 +52,8 @@ const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "silent"
 
 const KEYGEN_HINT =
   "Generate one with: node -e \"console.log('1:' + require('crypto').randomBytes(32).toString('base64'))\"";
+const BACKUP_KEYGEN_HINT =
+  "Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"";
 
 export type KeyRing = { current: number; keys: ReadonlyMap<number, Buffer> };
 
@@ -183,6 +186,36 @@ const schema = z.object({
   EMAIL_DELIVERY: optionalText()
     .transform((value) => value?.toLowerCase() ?? "smtp")
     .pipe(z.enum(["smtp", "log"], { error: "EMAIL_DELIVERY must be smtp or log." })),
+  // Nightly encrypted backups. Without BACKUP_KEY the backup job is off. The key is not the data key, so
+  // a backup can be kept elsewhere without giving away the secrets stored inside it.
+  BACKUP_KEY: optionalText().transform((value, ctx) => {
+    if (!value) return undefined;
+    const key = /^[A-Za-z0-9+/_-]+={0,2}$/.test(value) ? Buffer.from(value, "base64") : undefined;
+    if (key?.length !== 32) {
+      ctx.addIssue({
+        code: "custom",
+        message: `BACKUP_KEY must be 32 random bytes as base64. ${BACKUP_KEYGEN_HINT}`,
+      });
+      return z.NEVER;
+    }
+    return key;
+  }),
+  BACKUP_DIR: optionalText(),
+  BACKUP_KEEP: optionalText().pipe(
+    z
+      .string()
+      .regex(/^\d{1,3}$/, "BACKUP_KEEP must be how many backups to keep (1 to 365).")
+      .transform(Number)
+      .refine(
+        (count) => count >= 1 && count <= 365,
+        "BACKUP_KEEP must be how many backups to keep (1 to 365).",
+      )
+      .optional(),
+  ),
+  // "off" for a second copy of the app (the deploy script's trial start): it serves pages but runs no jobs.
+  BACKGROUND_JOBS: optionalText()
+    .transform((value) => value?.toLowerCase() ?? "on")
+    .pipe(z.enum(["on", "off"], { error: "BACKGROUND_JOBS must be on or off." })),
 });
 
 const checkedSchema = schema.superRefine((env, ctx) => {
@@ -200,6 +233,19 @@ const checkedSchema = schema.superRefine((env, ctx) => {
   }
   if (env.SMTP_HOST && !env.SMTP_FROM && !env.SMTP_USERNAME) {
     ctx.addIssue({ code: "custom", message: "Set SMTP_FROM (or SMTP_USERNAME) to send email." });
+  }
+  if (env.NODE_ENV === "production" && env.BACKUP_DIR && !path.isAbsolute(env.BACKUP_DIR)) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "BACKUP_DIR must be a full path (for example C:\\leffloard\\shared\\backups): the server runs in its release folder.",
+    });
+  }
+  if (env.BACKUP_KEY && !env.BACKUP_DIR) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Set BACKUP_DIR to a folder outside the app (for example C:\\leffloard\\shared\\backups).",
+    });
   }
 });
 
@@ -224,6 +270,7 @@ function productionWarnings(env: z.infer<typeof schema>): string[] {
   if ((env.SMTP_HOST || env.EMAIL_DELIVERY === "log") && !env.NOTIFY_EMAIL_TO) {
     warnings.push("NOTIFY_EMAIL_TO is empty: new inquiries are not emailed to you.");
   }
+  if (!env.BACKUP_KEY) warnings.push("BACKUP_KEY is not set: there are no nightly backups.");
   return warnings;
 }
 

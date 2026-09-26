@@ -38,3 +38,16 @@ export function formatRelative(date: Date, now: Date = new Date()): string {
 export function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;
 }
+
+// "512 B", "14.2 KB", "3.1 MB" (powers of 1024).
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}

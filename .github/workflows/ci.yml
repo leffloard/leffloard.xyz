@@ -72,6 +72,8 @@ jobs:
       - run: npm run test:unit
       - run: npm run test:integration
       - run: npm run build
+      # The deploy scripts, in the Windows PowerShell 5.1 the server has.
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File deploy\windows\tests\common.tests.ps1
 
   legacy:
     name: v1 backend tests

@@ -39,8 +39,8 @@ test("the first sign-in sets up the authenticator app and shows recovery codes o
   await page.getByLabel("Code from the app").fill(await freshTotp(secret));
   await page.getByRole("button", { name: "Turn on two-step sign-in" }).click();
   await expect(page.getByText("Two-step sign-in is on.")).toBeVisible();
+  await expect(page.getByTestId("recovery-codes").locator("li")).toHaveCount(10);
   recoveryCodes = await page.getByTestId("recovery-codes").locator("li").allTextContents();
-  expect(recoveryCodes).toHaveLength(10);
 
   await page.getByRole("link", { name: "Continue to the admin" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/, Test$/);
@@ -107,8 +107,10 @@ test("sign out other devices, and confirm it's you before sensitive changes", as
   await dialog.getByRole("button", { name: "Confirm" }).click();
   await expect(dialog).toBeHidden();
 
-  const fresh = await page.getByTestId("recovery-codes").locator("li").allTextContents();
-  expect(fresh).toHaveLength(10);
+  // allTextContents() does not wait, so wait for the new codes to be on the page first.
+  const codes = page.getByTestId("recovery-codes").locator("li");
+  await expect(codes).toHaveCount(10);
+  const fresh = await codes.allTextContents();
   expect(fresh).not.toContain(recoveryCodes[4]);
   recoveryCodes = fresh;
   await expect(page.getByText("10 of 10 left")).toBeVisible();

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  backupNowAction,
   retryFailedAction,
   testChannelAction,
   unblockAction,
@@ -181,6 +182,83 @@ export function BlockedCard({ lines }: { lines: BlockedLine[] }) {
             ))}
           </ul>
         )}
+      </CardBody>
+    </Card>
+  );
+}
+
+export type BackupLine = { name: string; size: string; when: string };
+
+const BACKUP_STATES: Record<string, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
+  ok: { label: "up to date", tone: "success" },
+  stale: { label: "no recent backup", tone: "warning" },
+  failed: { label: "last run failed", tone: "danger" },
+  off: { label: "off", tone: "warning" },
+};
+
+export function BackupsCard({
+  state,
+  folder,
+  keep,
+  lastRun,
+  files,
+}: {
+  state: string;
+  folder: string | null;
+  keep: number | null;
+  lastRun: string | null;
+  files: BackupLine[];
+}) {
+  const { run, pending, message } = useActionRunner();
+  const tone = BACKUP_STATES[state] ?? BACKUP_STATES.off!;
+  return (
+    <Card>
+      <CardHeader
+        title="Backups"
+        description={
+          folder
+            ? `Encrypted, every night from 03:15, into ${folder}. The newest ${keep} are kept.`
+            : "Off: set BACKUP_KEY and BACKUP_DIR on the server (see docs/DEPLOY.md)."
+        }
+        action={
+          <>
+            <Badge tone={tone.tone}>{tone.label}</Badge>
+            {folder ? (
+              <Button
+                size="sm"
+                pending={pending === "backup"}
+                onClick={() => run("backup", () => backupNowAction({}))}
+              >
+                Back up now
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+      <CardBody className="grid gap-3 text-[13px]">
+        {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+        {lastRun ? <p className="text-muted">Last run: {lastRun}</p> : null}
+        {files.length ? (
+          <ul className="divide-y divide-line">
+            {files.map((file) => (
+              <li
+                key={file.name}
+                className="flex flex-wrap items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
+              >
+                <span className="min-w-0 font-mono text-xs break-all">{file.name}</span>
+                <span className="text-xs text-muted">
+                  {file.size} · {file.when}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : folder ? (
+          <p className="text-muted">No backup files yet.</p>
+        ) : null}
+        <p className="text-xs text-muted">
+          Restore drill: <code className="font-mono">npm run restore -- &lt;file&gt; --check</code> on the
+          server.
+        </p>
       </CardBody>
     </Card>
   );

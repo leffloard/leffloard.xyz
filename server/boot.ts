@@ -18,5 +18,6 @@ export function boot(): void {
     process.exit(1);
   }
   log.info({ db: report.env.DB_NAME, site: report.env.SITE_URL }, "leffloard.xyz is starting");
-  startScheduler();
+  if (report.env.BACKGROUND_JOBS === "on") startScheduler();
+  else log.info("background jobs are off (BACKGROUND_JOBS=off)");
 }

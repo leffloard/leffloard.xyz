@@ -1,15 +1,20 @@
 import {
+  BackupsCard,
   BlockedCard,
   NotificationsCard,
   OutboxCard,
   type ChannelRow,
 } from "@/components/admin/settings/cards";
 import { PageHeader } from "@/components/admin/shell";
-import { formatDateTime, formatRelative } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { formatBytes, formatDateTime, formatRelative } from "@/lib/format";
+import { backupStatus } from "@/server/backup/service";
 import { requireAdmin } from "@/server/auth/dal";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
 import { listBlocked } from "@/server/inquiries/blocklist";
+import { listJobs } from "@/server/jobs/runner";
 import { readChannels } from "@/server/notify/channels";
 import { outboxSummary, recentOutbox } from "@/server/notify/outbox";
 
@@ -20,11 +25,14 @@ export default async function SettingsPage() {
   const db = await getDb();
   const at = now();
   const channels = readChannels();
-  const [summary, recent, blocked] = await Promise.all([
+  const [summary, recent, blocked, backups, jobs] = await Promise.all([
     outboxSummary(db),
     recentOutbox(db, 15),
     listBlocked(db),
+    backupStatus(db),
+    listJobs(db),
   ]);
+  const lastBackup = backups.last;
 
   const email = channels.email;
   const rows: ChannelRow[] = [
@@ -58,7 +66,7 @@ export default async function SettingsPage() {
     <>
       <PageHeader
         title="Settings"
-        description="Notifications and the inbox. More settings arrive with later modules."
+        description="Notifications, the inbox, backups and background jobs. More arrive with later modules."
       />
       <div className="grid grid-cols-1 gap-6">
         <NotificationsCard
@@ -83,6 +91,53 @@ export default async function SettingsPage() {
             error: item.lastError,
           }))}
         />
+        <BackupsCard
+          state={backups.state}
+          folder={backups.dir}
+          keep={backups.keep}
+          lastRun={
+            lastBackup?.lastFinishedAt
+              ? `${formatRelative(lastBackup.lastFinishedAt, at)}: ${lastBackup.lastOk ? "" : "failed: "}${lastBackup.lastMessage ?? ""}`
+              : null
+          }
+          files={backups.files.slice(0, 10).map((file) => ({
+            name: file.name,
+            size: formatBytes(file.bytes),
+            when: formatDateTime(file.modifiedAt),
+          }))}
+        />
+        <Card>
+          <CardHeader
+            title="Background jobs"
+            description="What the server runs on its own, and how it went last time."
+          />
+          <CardBody>
+            {jobs.length === 0 ? (
+              <p className="text-[13px] text-muted">No job has run yet.</p>
+            ) : (
+              <ul className="divide-y divide-line text-[13px]">
+                {jobs.map((job) => (
+                  <li key={job._id} className="grid gap-0.5 py-2 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{job._id}</span>
+                      {job.lastOk === null ? null : (
+                        <Badge tone={job.lastOk ? "success" : "danger"}>{job.lastOk ? "ok" : "failed"}</Badge>
+                      )}
+                      <span className="ml-auto text-xs text-muted">
+                        {job.lastFinishedAt
+                          ? `last run ${formatRelative(job.lastFinishedAt, at)}`
+                          : "not run yet"}
+                      </span>
+                    </div>
+                    {job.lastMessage ? (
+                      <p className="text-xs break-words text-muted">{job.lastMessage}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
         <BlockedCard
           lines={blocked.map((entry) => ({
             key: entry._id,

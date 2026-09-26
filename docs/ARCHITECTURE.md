@@ -5,7 +5,7 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M3, inbox and notifications**.
+This document grows with each milestone. Current state: **M4, going live: backups, background jobs and deploys**.
 
 ## Layout
 
@@ -41,12 +41,15 @@ server/                   Server-only code (every file imports "server-only")
                           idempotency keys
   inquiries/              The inbox: storing, listing and changing messages, the blocklist, the v1 data copy
   notify/                 Notification channels, templates, escaping, the outbox, SMTP and Discord senders
-  jobs/scheduler.ts       Background jobs inside the server process (croner)
+  jobs/                   Background jobs inside the server process (croner), with once-per-period runs
+  backup/                 Encrypted backups (gzip + AES-256-GCM), restore with a check first
   db/client.ts            One MongoClient per process
   db/migrate.ts           Migration runner with a database lock
   db/migrations/          The ordered migration list
   db/url.ts               Connection-string redaction for messages
-scripts/                  dev-db, migrate, migrate-legacy, admin, start, e2e-server (run with tsx)
+scripts/                  dev-db, migrate, migrate-legacy, backup, restore, admin, start, e2e-server (tsx)
+deploy/                   start-production.cjs (the service's launcher) and the Windows scripts: install,
+                          deploy, rollback, smoke, app (see docs/DEPLOY.md)
 tests/
   unit/                   No I/O
   integration/            Real MongoDB replica set per run
@@ -255,6 +258,29 @@ RFC 2047 encoded words are defused. The webhook address is never stored, logged 
 copy, `--verify` to compare. The v1 collection is only read. Each copy keeps its v1 id, so a unique index
 makes a second run add only what is new, and going back to v1 stays possible.
 
+## Operations
+
+The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
+
+- **Service.** NSSM runs `node C:\leffloard\current\start-production.cjs` as the virtual account
+  `NT SERVICE\leffloard`. The launcher reads the settings file (readable only by that account and
+  administrators), binds to 127.0.0.1 and starts Next.js's standalone `server.js`. Cloudflare Tunnel is the
+  only way in.
+- **Deploys** build in the checkout, assemble a release folder, back up, migrate, and start the release on a
+  trial port with `BACKGROUND_JOBS=off`. Only a healthy trial is switched live (a junction), and a release
+  that is unhealthy after the switch is rolled back automatically. Additive migrations keep rollbacks safe.
+- **Background jobs** (`server/jobs`) run in the server process with croner. `runJob()` records each run in
+  the `jobs` collection and claims it first, so two processes never run a job twice, and a periodic job that
+  was due while the server was off runs at the next check.
+- **Backups** (`server/backup`) are NDJSON exports (canonical Extended JSON, so every BSON type survives),
+  gzipped and encrypted with AES-256-GCM under `BACKUP_KEY`, with the plain header authenticated too.
+  Sessions, rate limits, the delivery log and the migration records are left out; a restore runs the
+  migrations, which also rebuild the indexes. A restore decrypts and checks the whole file before writing
+  anything, refuses a database that is not empty unless told to replace it, and compares every collection
+  with the backup's own counts. `npm run restore -- <file> --check` is the monthly drill.
+- **Health.** `/api/health?deep=1` reports configuration, database and migrations (these decide a deploy)
+  and, for information, whether the last backup is recent.
+
 ## Testing
 
 | Suite       | Command                             | Needs                                                   |
@@ -345,3 +371,7 @@ Every direct dependency and why it is here.
     `NOTIFY_EMAIL_TO`; parsing inbound mail would need a mail server or a paid service for little gain today.
 13. **v1's form API stays until the legacy code is removed (M12)**, so a v1 page still open in a browser
     during the cut-over keeps working. Its answers are checked against v1's own test cases.
+14. **Backups have their own key.** A copy of the backups can be kept anywhere without handing over the key
+    that protects the secrets inside the database, and either key can be replaced on its own.
+15. **A trial start before every switch.** The deploy proves the new release answers its deep health check
+    on the real database before visitors reach it; the old release keeps serving until then.

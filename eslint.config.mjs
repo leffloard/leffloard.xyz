@@ -18,4 +18,9 @@ export default defineConfig([
     "frontend/**",
     "backend/**",
   ]),
+  {
+    // The service's launcher is plain CommonJS: it runs next to the standalone server without a build step.
+    files: ["deploy/**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ]);

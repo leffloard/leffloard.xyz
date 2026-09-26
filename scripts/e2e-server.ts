@@ -2,13 +2,15 @@
 // production build started from the standalone output exactly as the VDS will run it.
 // Needs "npm run build" first.
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { MongoClient } from "mongodb";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { createOwner } from "@/server/auth/users";
 import { runMigrations } from "@/server/db/migrate";
 import {
+  E2E_BACKUP_DIR,
+  E2E_BACKUP_KEY,
   E2E_BASE_URL,
   E2E_DB_NAME,
   E2E_ENCRYPTION_KEYS,
@@ -41,6 +43,7 @@ async function main(): Promise<void> {
   await createOwner(client.db(E2E_DB_NAME), OWNER);
   await client.close();
   mkdirSync(path.dirname(E2E_MONGO_URL_FILE), { recursive: true });
+  rmSync(E2E_BACKUP_DIR, { recursive: true, force: true });
   writeFileSync(E2E_MONGO_URL_FILE, mongoUrl);
 
   const server = spawn(process.execPath, [STANDALONE_SERVER], {
@@ -59,6 +62,8 @@ async function main(): Promise<void> {
       // Emails are written to the log, so replies and alerts can be tested without a mail server.
       EMAIL_DELIVERY: "log",
       NOTIFY_EMAIL_TO: OWNER.email,
+      BACKUP_KEY: E2E_BACKUP_KEY,
+      BACKUP_DIR: E2E_BACKUP_DIR,
       LOG_LEVEL: process.env.LOG_LEVEL ?? "warn",
     },
   });

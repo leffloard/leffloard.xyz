@@ -1,3 +1,4 @@
+import { backupStatus } from "@/server/backup/service";
 import { getDb } from "@/server/db/client";
 import { pendingMigrations } from "@/server/db/migrate";
 import { readEnv } from "@/server/env";
@@ -25,6 +26,7 @@ export async function GET(request: Request): Promise<Response> {
       await (await getDb()).command({ ping: 1 });
     },
     pendingMigrationCount: async () => (await pendingMigrations(await getDb())).length,
+    backupState: async () => (await backupStatus(await getDb())).state,
     version: process.env.GIT_SHA ? `${packageJson.version}+${process.env.GIT_SHA}` : packageJson.version,
   });
   return Response.json(report, { status: report.ok ? 200 : 503, headers: NO_STORE });

@@ -6,6 +6,7 @@ import { fail, ok } from "@/lib/action-result";
 import { formatDateTime, plural } from "@/lib/format";
 import { adminAction } from "@/server/auth/action";
 import { audit } from "@/server/auth/audit";
+import { runBackup } from "@/server/backup/service";
 import { unblock } from "@/server/inquiries/blocklist";
 import { readChannels } from "@/server/notify/channels";
 import { postDiscord } from "@/server/notify/discord";
@@ -67,6 +68,20 @@ export const testChannelAction = adminAction(
     }
     return ok(null, "Test message posted to Discord.");
   },
+);
+
+// Runs a backup now, besides the nightly one. Needs "confirm it's you": a backup holds everything.
+export const backupNowAction = adminAction(
+  z.object({}),
+  async (_input, { db }) => {
+    const outcome = await runBackup(db, { now: true });
+    if (!outcome) return fail("Backups are not set up: set BACKUP_KEY and BACKUP_DIR on the server.");
+    if (!outcome.ran) return fail("A backup is already running. Try again in a minute.");
+    if (!outcome.ok) return fail(`The backup failed: ${outcome.message}`);
+    refresh();
+    return ok(null, `Backup written: ${outcome.message}.`);
+  },
+  { sudo: true },
 );
 
 export const retryFailedAction = adminAction(z.object({}), async (_input, { db }) => {

@@ -20,11 +20,11 @@ import { readEnv } from "@/server/env";
 export const metadata = { title: "Today" };
 
 const ROADMAP = [
-  ["M4", "Going live on the VDS: backups, deploys, Cloudflare Tunnel"],
   ["M5", "Clients, projects, tasks, revisions and time tracking"],
   ["M6", "Calendar and booking"],
   ["M7", "Quotes, invoices, crypto and bank payments, finance"],
   ["M8", "Client portal"],
+  ["M9", "Content editor for the public site, and GitHub sync"],
 ] as const;
 
 function greeting(at: Date): string {

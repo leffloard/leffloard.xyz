@@ -37,6 +37,10 @@ describe("readEnv", () => {
         SMTP_FROM: undefined,
         NOTIFY_EMAIL_TO: undefined,
         EMAIL_DELIVERY: "smtp",
+        BACKUP_KEY: undefined,
+        BACKUP_DIR: undefined,
+        BACKUP_KEEP: undefined,
+        BACKGROUND_JOBS: "on",
       },
     });
   });
@@ -149,7 +153,35 @@ describe("readEnv", () => {
       "CF_ACCESS_* is not set: /admin is protected by the sign-in only.",
       "CLIENT_IP_SOURCE is socket: behind the Cloudflare Tunnel set it to cloudflare.",
       "SMTP_* is not set: no email alerts, and the inbox cannot send replies.",
+      "BACKUP_KEY is not set: there are no nightly backups.",
     ]);
+  });
+
+  it("reads the backup settings, and wants a folder with the key", () => {
+    const key = Buffer.alloc(32, 3).toString("base64");
+    const report = readEnv({
+      ...VALID,
+      BACKUP_KEY: key,
+      BACKUP_DIR: "C:\\leffloard\\shared\\backups",
+      BACKUP_KEEP: "30",
+    });
+    expect(report.ok && report.env).toMatchObject({ BACKUP_KEY: Buffer.alloc(32, 3), BACKUP_KEEP: 30 });
+    expect(problemsFor({ BACKUP_KEY: key })).toEqual([
+      "Set BACKUP_DIR to a folder outside the app (for example C:\\leffloard\\shared\\backups).",
+    ]);
+    const [problem] = problemsFor({ BACKUP_KEY: "short-secret-value", BACKUP_DIR: "/backups" });
+    expect(problem).toMatch(/^BACKUP_KEY must be 32 random bytes as base64/);
+    expect(problem).not.toContain("short-secret-value");
+    expect(problemsFor({ BACKUP_KEEP: "0" })).toEqual([
+      "BACKUP_KEEP must be how many backups to keep (1 to 365).",
+    ]);
+    expect(problemsFor({ BACKGROUND_JOBS: "maybe" })).toEqual(["BACKGROUND_JOBS must be on or off."]);
+    // The production server runs in its release folder, so a relative folder would move with every deploy.
+    const production = { NODE_ENV: "production", BACKUP_KEY: key };
+    expect(problemsFor({ ...production, BACKUP_DIR: "backups" })[0]).toMatch(
+      /^BACKUP_DIR must be a full path/,
+    );
+    expect(problemsFor({ ...production, BACKUP_DIR: "/var/backups/leffloard" })).toEqual([]);
   });
 
   it("reads the v1 notification settings under the same names", () => {

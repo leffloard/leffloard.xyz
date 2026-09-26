@@ -20,6 +20,8 @@
     "test:e2e": "playwright test",
     "migrate": "tsx --conditions=react-server scripts/migrate.ts",
     "migrate-legacy": "tsx --conditions=react-server scripts/migrate-legacy.ts",
+    "backup": "tsx --conditions=react-server scripts/backup.ts",
+    "restore": "tsx --conditions=react-server scripts/restore.ts",
     "admin": "tsx --conditions=react-server scripts/admin.ts",
     "admin:create": "tsx --conditions=react-server scripts/admin.ts create"
   },

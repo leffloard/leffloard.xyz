@@ -80,11 +80,18 @@ v1 data is only read, never changed.
 | `npm run dev` | Development server with hot reload |
 | `npm run migrate` | Applies pending migrations to the database in `MONGO_URL` (`npm run migrate -- --status` only lists them) |
 | `npm run migrate-legacy` | Copies the v1 requests into the inbox (dry run; `-- --apply` to copy, `-- --verify` to check) |
+| `npm run backup` | Writes an encrypted backup to `BACKUP_DIR` now (the server also makes one every night) |
+| `npm run restore -- <file> --check` | Restore drill: restores a backup into a temporary database, compares, deletes it |
 | `npm run admin -- <command>` | Owner account tools: `create`, `status`, `reset-password`, `reset-2fa`, `unlock` |
 | `npm run build`, then `npm start` | Production build, started the way the server runs it |
 | `npm run lint`, `npm run typecheck`, `npm run format` | Code checks and formatting |
 | `npm run test:unit`, `npm run test:integration` | Tests (the integration tests start their own MongoDB) |
 | `npm run build`, then `npm run test:e2e` | Browser tests (first time: `npx playwright install chromium`) |
+
+### Going live
+
+The server setup, the Cloudflare Tunnel, the switch from v1, deploys, rollbacks and restoring a backup are in
+[docs/DEPLOY.md](docs/DEPLOY.md). In short: `install-service.ps1` once, then `deploy.ps1` for every update.
 
 ### Configuration
 

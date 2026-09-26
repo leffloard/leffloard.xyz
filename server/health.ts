@@ -4,16 +4,21 @@ import type { EnvReport } from "@/server/env";
 
 export type CheckState = "ok" | "error" | "pending" | "skipped";
 
+export type BackupState = "off" | "ok" | "stale" | "failed" | "unknown";
+
 export type DeepHealth = {
   ok: boolean;
   version: string;
   checks: { env: CheckState; db: CheckState; migrations: CheckState };
+  // For information: an old backup must not make a deploy roll back.
+  info?: { backup: BackupState };
 };
 
 export type HealthDeps = {
   envReport: () => EnvReport;
   pingDb: () => Promise<void>;
   pendingMigrationCount: () => Promise<number>;
+  backupState?: () => Promise<BackupState>;
   version: string;
   timeoutMs?: number;
 };
@@ -53,7 +58,16 @@ export async function deepHealth(deps: HealthDeps): Promise<DeepHealth> {
   }
 
   const ok = Object.values(checks).every((state) => state === "ok");
-  return { ok, version: deps.version, checks };
+  if (!deps.backupState) return { ok, version: deps.version, checks };
+  let backup: BackupState = "unknown";
+  if (checks.db === "ok") {
+    try {
+      backup = await withTimeout(deps.backupState(), timeoutMs);
+    } catch {
+      backup = "unknown";
+    }
+  }
+  return { ok, version: deps.version, checks, info: { backup } };
 }
 
 export function tokenMatches(given: string | null, expected: string | undefined): boolean {

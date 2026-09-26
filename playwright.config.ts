@@ -21,14 +21,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /admin-inbox\.spec\.ts/,
+      testIgnore: /admin-(inbox|settings)\.spec\.ts/,
       use: chromium,
     },
     {
       // Admin modules sign in with a session written to the database. They run after the sign-in tests,
       // which sign out every other session on purpose.
       name: "admin-modules",
-      testMatch: /admin-inbox\.spec\.ts/,
+      testMatch: /admin-(inbox|settings)\.spec\.ts/,
       dependencies: ["chromium"],
       use: chromium,
     },

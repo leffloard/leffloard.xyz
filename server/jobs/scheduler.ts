@@ -1,12 +1,13 @@
 import "server-only";
 import { Cron } from "croner";
+import { runBackup } from "@/server/backup/service";
 import { getDb } from "@/server/db/client";
 import { log } from "@/server/log";
 import { drainOutbox } from "@/server/notify/outbox";
 
-// Background work inside the web server process, started once from instrumentation.ts. Jobs must be safe
-// to run twice at the same moment (the outbox claims each message), because a second server process, or a
-// restart during a run, can overlap with this one.
+// Background work inside the web server process, started once from instrumentation.ts. Every job is safe
+// to run in two processes at once: the outbox claims each message, and runJob() (server/jobs/runner.ts)
+// lets only one process run a job and records the result.
 
 type Job = { name: string; pattern: string; run: () => Promise<void> };
 
@@ -18,6 +19,15 @@ const JOBS: Job[] = [
     run: async () => {
       const summary = await drainOutbox(await getDb());
       if (summary.sent + summary.failed + summary.retrying > 0) log.info(summary, "outbox run");
+    },
+  },
+  {
+    // The nightly backup. Checked every 15 minutes, so a night the server was off is caught up.
+    name: "backup",
+    pattern: "*/15 * * * *",
+    run: async () => {
+      const outcome = await runBackup(await getDb(), { now: false });
+      if (outcome?.ran) log.info({ ok: outcome.ok, result: outcome.message }, "nightly backup");
     },
   },
 ];
