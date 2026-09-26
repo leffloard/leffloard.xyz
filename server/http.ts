@@ -1,5 +1,10 @@
 import "server-only";
 
+// JSON answers from route handlers are never cached.
+export function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
+  return Response.json(body, { status, headers: { "cache-control": "no-store", ...headers } });
+}
+
 // Reads a request body as text, giving up (null) once it is larger than `maxBytes`, so a huge body is never
 // buffered in full.
 export async function readBodyText(request: Request, maxBytes: number): Promise<string | null> {

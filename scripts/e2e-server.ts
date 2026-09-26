@@ -56,6 +56,9 @@ async function main(): Promise<void> {
       HEALTH_TOKEN: E2E_HEALTH_TOKEN,
       DATA_ENCRYPTION_KEYS: E2E_ENCRYPTION_KEYS,
       CLIENT_IP_SOURCE: "socket",
+      // Emails are written to the log, so replies and alerts can be tested without a mail server.
+      EMAIL_DELIVERY: "log",
+      NOTIFY_EMAIL_TO: OWNER.email,
       LOG_LEVEL: process.env.LOG_LEVEL ?? "warn",
     },
   });

@@ -1,6 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_BASE_URL } from "./tests/e2e/fixtures";
 
+const chromium = {
+  ...devices["Desktop Chrome"],
+  // For machines with a preinstalled Chromium instead of "npx playwright install chromium".
+  launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
+};
+
 // Runs against the production build: "npm run build", then "npm run test:e2e".
 export default defineConfig({
   testDir: "tests/e2e",
@@ -15,11 +21,16 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        // For machines with a preinstalled Chromium instead of "npx playwright install chromium".
-        launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
-      },
+      testIgnore: /admin-inbox\.spec\.ts/,
+      use: chromium,
+    },
+    {
+      // Admin modules sign in with a session written to the database. They run after the sign-in tests,
+      // which sign out every other session on purpose.
+      name: "admin-modules",
+      testMatch: /admin-inbox\.spec\.ts/,
+      dependencies: ["chromium"],
+      use: chromium,
     },
   ],
   webServer: {

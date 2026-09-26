@@ -90,6 +90,9 @@ test("machine-readable files", async ({ request }) => {
   expect(pdf.headers()["content-type"]).toBe("application/pdf");
   expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
 
+  const traversal = await request.get("/..%2F..%2Fetc%2Fpasswd");
+  expect(await traversal.text()).not.toContain("root:");
+
   const security = await (await request.get("/.well-known/security.txt")).text();
   expect(security).toMatch(/^Contact: mailto:/m);
   expect(security).toMatch(/^Expires: \d{4}-/m);

@@ -45,4 +45,32 @@ export const migrations: Migration[] = [
       await db.collection("audit_log").createIndex({ at: 1 }, { expireAfterSeconds: 365 * 24 * 3600 });
     },
   },
+  {
+    id: "0004",
+    name: "inbox-and-outbox",
+    async up(db) {
+      const expires = { expireAfterSeconds: 0 };
+      const inquiries = db.collection("inquiries");
+      await inquiries.createIndex({ publicId: 1 }, { unique: true });
+      await inquiries.createIndex({ ref: 1 }, { unique: true });
+      // Migrated v1 requests: running the migration twice cannot copy one twice.
+      await inquiries.createIndex(
+        { legacyId: 1 },
+        { unique: true, partialFilterExpression: { legacyId: { $exists: true } } },
+      );
+      await inquiries.createIndex({ status: 1, receivedAt: -1 });
+      await inquiries.createIndex({ kind: 1, receivedAt: -1 });
+      await inquiries.createIndex({ receivedAt: -1 });
+      await inquiries.createIndex({ email: 1 });
+      await inquiries.createIndex({ purgeAt: 1 }, expires);
+
+      const outbox = db.collection("outbox");
+      await outbox.createIndex({ dedupeKey: 1 }, { unique: true });
+      await outbox.createIndex({ status: 1, nextAttemptAt: 1 });
+      await outbox.createIndex({ createdAt: -1 });
+      await outbox.createIndex({ purgeAt: 1 }, expires);
+
+      await db.collection("idempotency_keys").createIndex({ expiresAt: 1 }, expires);
+    },
+  },
 ];

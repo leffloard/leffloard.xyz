@@ -5,7 +5,7 @@ runs the owner's daily work (inquiries, clients, projects, meetings, quotes, inv
 It replaces the v1 Vite frontend and FastAPI backend, which stay in `frontend/` and `backend/` until the
 cut-over (milestone M4) and are deleted 14 days after it.
 
-This document grows with each milestone. Current state: **M2, design system and public site**.
+This document grows with each milestone. Current state: **M3, inbox and notifications**.
 
 ## Layout
 
@@ -16,7 +16,10 @@ app/                      Routes (App Router)
   sitemap.ts, robots.ts   Machine-readable files (plus manifest.ts and .well-known/security.txt)
   (admin)/admin/          Admin, with its own root layout (dynamic, noindex)
     login/, setup/        Sign-in, two-step check, first-time authenticator setup
-    (shell)/              Signed-in pages: Today, Security
+    (shell)/              Signed-in pages: Today, Inbox, Security, Settings
+  api/inquiries/route.ts  The contact form's endpoint
+  api/requests/route.ts   The v1 form API, same contract as v1 (kept until the legacy code is removed)
+  api/[[...path]]/        JSON 404 for unknown API addresses
   api/health/route.ts     Health check (shallow and deep)
   api/csp-report/route.ts Receives Content Security Policy violation reports
   global-not-found.tsx    404 page for every unmatched address
@@ -24,6 +27,7 @@ app/                      Routes (App Router)
 components/               UI: ui/ (buttons, fields, cards), site/ (public site) and admin/
 content/                  Public site content until the CMS (M9): site facts, work, services, CV, blog posts
 lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, CSP builder, formatting
+  intake/                 The form rules shared by browser and server (ported from the v1 backend)
 server/                   Server-only code (every file imports "server-only")
   env.ts                  Validated configuration, plain-English errors
   boot.ts                 Runs once at start-up (via instrumentation.ts); stops on bad config
@@ -33,17 +37,22 @@ server/                   Server-only code (every file imports "server-only")
   http.ts                 Size-limited request body reading
   auth/                   Owner account, sessions, sign-in steps, passkeys, audit log, admin action wrapper
   content/                Blog rendering (Markdown pipeline), OG image and CV PDF generation
-  security/               Password hashing, encryption, rate limits, lockouts, Turnstile, Access, CSRF, NoSQL guard
+  security/               Password hashing, encryption, rate limits, lockouts, Turnstile, Access, CSRF, NoSQL guard,
+                          idempotency keys
+  inquiries/              The inbox: storing, listing and changing messages, the blocklist, the v1 data copy
+  notify/                 Notification channels, templates, escaping, the outbox, SMTP and Discord senders
+  jobs/scheduler.ts       Background jobs inside the server process (croner)
   db/client.ts            One MongoClient per process
   db/migrate.ts           Migration runner with a database lock
   db/migrations/          The ordered migration list
   db/url.ts               Connection-string redaction for messages
-scripts/                  dev-db, migrate, admin, start, e2e-server (run with tsx)
+scripts/                  dev-db, migrate, migrate-legacy, admin, start, e2e-server (run with tsx)
 tests/
   unit/                   No I/O
   integration/            Real MongoDB replica set per run
   e2e/                    Playwright against the production (standalone) build
-  test_requests_api.py    v1 backend tests; the spec for the intake port in M3
+  test_requests_api.py    v1 backend tests, the spec for the intake
+  legacy-parity.md        Where each of the 160 v1 test cases is checked now
 instrumentation.ts        Calls boot() on the Node.js runtime
 proxy.ts                  Request ids and CSP headers with per-request nonces. Never authorization.
 next.config.ts            Standalone output, security headers
@@ -192,6 +201,60 @@ generated images in the site's style (`opengraph-image.tsx`, per case study and 
 `/.well-known/security.txt` and Person / BlogPosting structured data. Old v1 addresses redirect: the request
 form (`/?type=…`) to `/contact`, and the template blog posts to `/blog`.
 
+## Inbox and notifications
+
+### Intake
+
+Visitors write through the contact form (`POST /api/inquiries`): a three-step project brief, or a one-step
+question, revision request or call request. Pages and scripts written for v1 can still use
+`POST /api/requests`, with v1's exact answers (201, 422 `{detail: [{field, message}]}`, 429). Both end in
+`submitInquiry()` (`server/inquiries/intake.ts`).
+
+The field rules are a line-by-line port of v1's `schemas.py` (`lib/intake/`): the same limits (counted in code
+points, like Python), whitespace, control characters, email check, IANA time zones and the call date window
+in the visitor's own zone. The form runs the same code in the browser, so a mistake shows before sending.
+
+| Protection       | How                                                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Bots             | Hidden honeypot field (a filled one gets a fake success and nothing is stored), then Cloudflare Turnstile on the contact form |
+| Floods           | Five messages per address every ten minutes, shared by both endpoints and stored in MongoDB                                   |
+| Double submits   | `Idempotency-Key`: a form sent twice is stored once, and the second answer repeats the first                                  |
+| Cross-site posts | Origin and `Sec-Fetch-Site` check                                                                                             |
+| Injection        | JSON only, 32 KB limit, operator-like keys refused, every field validated and length-capped                                   |
+| Unwanted senders | A blocklist (address or domain) sends their messages to spam without alerts, with the usual answer                            |
+
+### The inbox
+
+`/admin/inbox` lists messages by view (Inbox, New, Open, Confirmed, Snoozed, Done, Declined, Spam, All), kind
+and search (escaped, case-insensitive), with keyboard navigation (`j`, `k`, `/`). A message page has the
+reply form, status changes (with an optional status email in v1's wording), call scheduling in the visitor's
+time zone, labels, a private note, snooze and delete. Every change goes through `adminAction()`.
+
+Retention follows the privacy notice: a TTL index deletes a message 24 months after its last activity, and
+spam after 30 days. Deleting a message also deletes its queued emails, and is written to the audit log.
+
+### Notifications
+
+Every email and Discord message leaves through the outbox (`server/notify/outbox.ts`):
+
+1. The message is rendered and stored first, with a `dedupeKey`, so an event can't be announced twice and a
+   retry sends exactly the same text.
+2. It is sent right after the response (`after()`), or by the scheduler's minute job.
+3. A sender claims a message before sending, so two processes never send the same one. A failure is retried
+   after 1, 5 and 30 minutes, then 2 and 12 hours; after six attempts it is marked failed and shown in
+   Settings, where it can be retried.
+
+Visitor text is escaped for each channel, with v1's rules (`server/notify/escape.ts`): Discord Markdown,
+links and mentions are neutralised and `allowed_mentions` is empty; email header text is kept on one line and
+RFC 2047 encoded words are defused. The webhook address is never stored, logged or shown in an error.
+`EMAIL_DELIVERY=log` writes emails to the log instead (development and browser tests).
+
+### Moving v1's data
+
+`npm run migrate-legacy` copies v1's `requests` collection into the inbox: a dry run by default, `--apply` to
+copy, `--verify` to compare. The v1 collection is only read. Each copy keeps its v1 id, so a unique index
+makes a second run add only what is new, and going back to v1 stays possible.
+
 ## Testing
 
 | Suite       | Command                             | Needs                                                   |
@@ -251,6 +314,8 @@ Every direct dependency and why it is here.
 | `shiki`, `@shikijs/rehype`                                                                      | Code highlighting at build time, in a light and a dark theme, with no JavaScript sent to the browser.                 |
 | `@react-pdf/renderer`                                                                           | Generates `/cv.pdf` from the same data as the CV page.                                                                |
 | `@axe-core/playwright`                                                                          | Accessibility checks (WCAG 2.2 AA) in the browser tests.                                                              |
+| `nodemailer`                                                                                    | Sends email over SMTP (STARTTLS, TLS or plain), with correct encoding of non-ASCII names and subjects.                |
+| `croner`                                                                                        | Runs the background jobs (the outbox now; backups and digests later) without overlapping runs.                        |
 
 ## Decisions
 
@@ -274,3 +339,9 @@ Every direct dependency and why it is here.
    typed files in `content/` are reviewed like code and move into the database in M9.
 10. **No third-party scripts on public pages** (fonts are self-hosted, no analytics tags); Cloudflare
     Turnstile on forms is the only exception.
+11. **An outbox for every outgoing message.** v1 sent alerts in a background task and only logged failures;
+    a stored, deduplicated and retried message survives a slow mail server or a restart.
+12. **Replies arrive in the owner's mailbox, not in the app.** Emails to visitors set Reply-To to
+    `NOTIFY_EMAIL_TO`; parsing inbound mail would need a mail server or a paid service for little gain today.
+13. **v1's form API stays until the legacy code is removed (M12)**, so a v1 page still open in a browser
+    during the cut-over keeps working. Its answers are checked against v1's own test cases.

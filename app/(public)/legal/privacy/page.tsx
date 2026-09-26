@@ -55,14 +55,19 @@ export default function PrivacyPage() {
         <li>MongoDB Atlas: the database that stores inquiries and client records.</li>
         <li>Google (Gmail): email.</li>
         <li>Discord: private notifications to me about new messages.</li>
+        <li>
+          Anthropic (Claude): only when I use an AI assistant to sort messages or draft replies, and never for
+          a message whose sender ticked &ldquo;Don&apos;t use AI tools on my message&rdquo;.
+        </li>
         <li>Cloudflare: network, security and bot checks (Turnstile) for the site.</li>
         <li>NOWPayments: only if you choose to pay with cryptocurrency.</li>
       </ul>
       <h2>How long I keep it</h2>
       <p>
-        Inquiries that do not become a project are deleted after 24 months without contact. Client records and
-        invoices are kept for as long as Turkish tax and commercial law requires. Security logs are kept for
-        up to 12 months.
+        Inquiries that do not become a project are deleted after 24 months without contact, and messages
+        marked as spam after 30 days. Copies of the emails the site sends are kept for 30 days to check they
+        arrived. Client records and invoices are kept for as long as Turkish tax and commercial law requires.
+        Security logs are kept for up to 12 months.
       </p>
       <h2>Your rights</h2>
       <p>

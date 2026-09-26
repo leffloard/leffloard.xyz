@@ -145,6 +145,44 @@ const schema = z.object({
       .regex(/^[a-f0-9]{64}$/, "CF_ACCESS_AUD must be the 64-character Application Audience (AUD) tag.")
       .optional(),
   ),
+  // Notifications: the same variable names as the v1 backend, so the existing .env values carry over.
+  DISCORD_WEBHOOK_URL: optionalText().pipe(
+    z
+      .url({
+        protocol: /^https$/,
+        error: "DISCORD_WEBHOOK_URL must be the https:// address of a Discord webhook.",
+      })
+      .optional(),
+  ),
+  SMTP_HOST: optionalText(),
+  SMTP_PORT: optionalText().pipe(
+    z
+      .string()
+      .regex(/^\d{1,5}$/, "SMTP_PORT must be a port number.")
+      .transform(Number)
+      .refine((port) => port > 0 && port < 65536, "SMTP_PORT must be a port number.")
+      .optional(),
+  ),
+  SMTP_SECURITY: optionalText()
+    .transform((value) => value?.toLowerCase() ?? "starttls")
+    .pipe(z.enum(["starttls", "ssl", "none"], { error: "SMTP_SECURITY must be starttls, ssl or none." })),
+  SMTP_USERNAME: optionalText(),
+  // Not trimmed: an app password may end in a space.
+  SMTP_PASSWORD: z
+    .string()
+    .optional()
+    .transform((value) => value || undefined),
+  SMTP_FROM: optionalText(),
+  NOTIFY_EMAIL_TO: optionalText().pipe(
+    z
+      .string()
+      .regex(/^[^\s@]+@[^\s@]+$/, "NOTIFY_EMAIL_TO must be an email address.")
+      .optional(),
+  ),
+  // "log" writes emails to the server log instead of sending them (development and tests).
+  EMAIL_DELIVERY: optionalText()
+    .transform((value) => value?.toLowerCase() ?? "smtp")
+    .pipe(z.enum(["smtp", "log"], { error: "EMAIL_DELIVERY must be smtp or log." })),
 });
 
 const checkedSchema = schema.superRefine((env, ctx) => {
@@ -160,6 +198,9 @@ const checkedSchema = schema.superRefine((env, ctx) => {
       message: "Set both CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD, or neither.",
     });
   }
+  if (env.SMTP_HOST && !env.SMTP_FROM && !env.SMTP_USERNAME) {
+    ctx.addIssue({ code: "custom", message: "Set SMTP_FROM (or SMTP_USERNAME) to send email." });
+  }
 });
 
 // Allowed, but worth a line in the start-up log of a production server.
@@ -174,6 +215,14 @@ function productionWarnings(env: z.infer<typeof schema>): string[] {
     warnings.push("CF_ACCESS_* is not set: /admin is protected by the sign-in only.");
   if (env.CLIENT_IP_SOURCE === "socket") {
     warnings.push("CLIENT_IP_SOURCE is socket: behind the Cloudflare Tunnel set it to cloudflare.");
+  }
+  if (env.EMAIL_DELIVERY === "log") {
+    warnings.push("EMAIL_DELIVERY is log: emails are written to the log, not sent.");
+  } else if (!env.SMTP_HOST) {
+    warnings.push("SMTP_* is not set: no email alerts, and the inbox cannot send replies.");
+  }
+  if ((env.SMTP_HOST || env.EMAIL_DELIVERY === "log") && !env.NOTIFY_EMAIL_TO) {
+    warnings.push("NOTIFY_EMAIL_TO is empty: new inquiries are not emailed to you.");
   }
   return warnings;
 }

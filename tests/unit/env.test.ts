@@ -28,6 +28,15 @@ describe("readEnv", () => {
         TURNSTILE_SECRET_KEY: undefined,
         CF_ACCESS_TEAM_DOMAIN: undefined,
         CF_ACCESS_AUD: undefined,
+        DISCORD_WEBHOOK_URL: undefined,
+        SMTP_HOST: undefined,
+        SMTP_PORT: undefined,
+        SMTP_SECURITY: "starttls",
+        SMTP_USERNAME: undefined,
+        SMTP_PASSWORD: undefined,
+        SMTP_FROM: undefined,
+        NOTIFY_EMAIL_TO: undefined,
+        EMAIL_DELIVERY: "smtp",
       },
     });
   });
@@ -139,7 +148,69 @@ describe("readEnv", () => {
       "TURNSTILE_* is not set: sign-in and forms have no bot check.",
       "CF_ACCESS_* is not set: /admin is protected by the sign-in only.",
       "CLIENT_IP_SOURCE is socket: behind the Cloudflare Tunnel set it to cloudflare.",
+      "SMTP_* is not set: no email alerts, and the inbox cannot send replies.",
     ]);
+  });
+
+  it("reads the v1 notification settings under the same names", () => {
+    const report = readEnv({
+      ...VALID,
+      SMTP_HOST: "smtp.gmail.com",
+      SMTP_USERNAME: "me@gmail.com",
+      SMTP_PASSWORD: "app password ",
+      SMTP_SECURITY: "SSL",
+      NOTIFY_EMAIL_TO: "me@gmail.com",
+      DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1/token",
+    });
+    expect(report.ok && report.env).toMatchObject({
+      SMTP_HOST: "smtp.gmail.com",
+      SMTP_SECURITY: "ssl",
+      SMTP_PASSWORD: "app password ",
+      NOTIFY_EMAIL_TO: "me@gmail.com",
+      DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1/token",
+    });
+  });
+
+  it("explains wrong notification settings without repeating them", () => {
+    const problems = problemsFor({
+      SMTP_HOST: "smtp.example.com",
+      SMTP_PORT: "smtp",
+      SMTP_SECURITY: "tls",
+      NOTIFY_EMAIL_TO: "me",
+      EMAIL_DELIVERY: "carrier-pigeon",
+      DISCORD_WEBHOOK_URL: "http://discord.com/api/webhooks/1/SECRET-TOKEN",
+    });
+    expect(problems).toEqual([
+      "DISCORD_WEBHOOK_URL must be the https:// address of a Discord webhook.",
+      "SMTP_PORT must be a port number.",
+      "SMTP_SECURITY must be starttls, ssl or none.",
+      "NOTIFY_EMAIL_TO must be an email address.",
+      "EMAIL_DELIVERY must be smtp or log.",
+    ]);
+    expect(problems.join(" ")).not.toContain("SECRET-TOKEN");
+    expect(problemsFor({ SMTP_HOST: "smtp.example.com" })).toEqual([
+      "Set SMTP_FROM (or SMTP_USERNAME) to send email.",
+    ]);
+    expect(problemsFor({ SMTP_PORT: "70000" })).toEqual(["SMTP_PORT must be a port number."]);
+  });
+
+  it("warns when production mail is only logged, or alerts have nowhere to go", () => {
+    const base = {
+      ...VALID,
+      NODE_ENV: "production",
+      SITE_URL: "https://leffloard.xyz",
+      CLIENT_IP_SOURCE: "cloudflare",
+    };
+    const logged = readEnv({ ...base, EMAIL_DELIVERY: "log" });
+    expect(logged.warnings).toContain("EMAIL_DELIVERY is log: emails are written to the log, not sent.");
+    expect(logged.warnings).toContain("NOTIFY_EMAIL_TO is empty: new inquiries are not emailed to you.");
+    const smtp = readEnv({
+      ...base,
+      SMTP_HOST: "smtp.gmail.com",
+      SMTP_USERNAME: "me@gmail.com",
+      NOTIFY_EMAIL_TO: "me@gmail.com",
+    });
+    expect(smtp.warnings.filter((warning) => /SMTP|NOTIFY|EMAIL/.test(warning))).toEqual([]);
   });
 
   it("warns about variables only the v1 backend used", () => {

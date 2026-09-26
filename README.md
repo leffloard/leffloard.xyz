@@ -49,6 +49,29 @@ phone numbers and other things that must not be published.
 Lost access? `npm run admin -- status` shows the account's setup; `reset-password`, `reset-2fa` and `unlock`
 are the recovery paths (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recovery)).
 
+### The inbox
+
+Messages from the contact form (`/contact`) land in **Inbox**: project briefs, questions, revision requests
+and call requests. Open one to reply by email, change its status (and tell the visitor if you like), confirm
+a call time, add labels or a private note, snooze it, mark it as spam or delete it. Keys in the list: `j`/`k`
+to move, `Enter` to open, `/` to search.
+
+Alerts about new messages go to Discord and to your email. Set them up in the server's environment (details
+in [`.env.example`](.env.example); the names are the same as in the v1 `.env`):
+
+1. **Email** (alerts and replies): for Gmail, create an App Password and set `SMTP_HOST=smtp.gmail.com`,
+   `SMTP_USERNAME`, `SMTP_PASSWORD` and `NOTIFY_EMAIL_TO`.
+2. **Discord** (alerts): a channel webhook in `DISCORD_WEBHOOK_URL`.
+3. Restart, open **Settings** and use **Send a test email** and **Send a test to Discord**.
+
+Locally, `npm run dev:db` sets `EMAIL_DELIVERY=log`, so emails are printed in the terminal instead of sent.
+Settings also shows the delivery log (failed messages are retried and can be retried by hand) and the
+blocked senders.
+
+**Moving the v1 requests** (once, at the cut-over): `npm run migrate-legacy` shows what would be copied,
+`npm run migrate-legacy -- --apply` copies it, and `npm run migrate-legacy -- --verify` checks the copy. The
+v1 data is only read, never changed.
+
 ### Useful commands
 
 | Command | What it does |
@@ -56,6 +79,7 @@ are the recovery paths (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recovery
 | `npm run dev:db` | Local MongoDB (replica set) on port 27027, applies migrations |
 | `npm run dev` | Development server with hot reload |
 | `npm run migrate` | Applies pending migrations to the database in `MONGO_URL` (`npm run migrate -- --status` only lists them) |
+| `npm run migrate-legacy` | Copies the v1 requests into the inbox (dry run; `-- --apply` to copy, `-- --verify` to check) |
 | `npm run admin -- <command>` | Owner account tools: `create`, `status`, `reset-password`, `reset-2fa`, `unlock` |
 | `npm run build`, then `npm start` | Production build, started the way the server runs it |
 | `npm run lint`, `npm run typecheck`, `npm run format` | Code checks and formatting |

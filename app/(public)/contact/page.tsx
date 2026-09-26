@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
 import { Availability } from "@/components/site/availability";
+import { ContactForm } from "@/components/site/contact-form";
 import { Arrow, LinkButton } from "@/components/site/link-button";
 import { PageIntro, Section } from "@/components/site/section";
 import { site } from "@/content/site";
+import { getEnv } from "@/server/env";
 
 export const metadata: Metadata = {
   title: "Contact",
-  description: "Tell me about your project, or ask a quick question. Email is the fastest way to start.",
+  description: "Tell me about your project, ask a question or request a call.",
   alternates: { canonical: "/contact" },
 };
+
+// Rendered per request: the bot check's site key is read from the server's configuration.
+export const dynamic = "force-dynamic";
 
 const include = [
   "What you want to build, and the problem it solves",
@@ -34,29 +39,40 @@ export default function ContactPage() {
       <PageIntro
         label="Contact"
         title="Tell me about your project."
-        intro="A few sentences are enough to start. Email is the fastest way to reach me."
+        intro="A few sentences are enough to start. Use the form below, or email me directly."
       >
         <div
           className="rise mt-10 flex flex-wrap items-center gap-4"
           style={{ "--delay": "240ms" } as React.CSSProperties}
         >
-          <LinkButton href={`mailto:${site.email}?subject=${subject}`}>
-            Email {site.email} <Arrow />
+          <LinkButton href="#write" variant="primary">
+            Write to me <Arrow />
+          </LinkButton>
+          <LinkButton href={`mailto:${site.email}?subject=${subject}`} variant="secondary">
+            {site.email}
           </LinkButton>
           <Availability />
         </div>
       </PageIntro>
-      <Section id="include" index="01" label="Worth including">
-        <ol className="grid gap-3 md:max-w-3xl">
-          {include.map((line, index) => (
-            <li key={line} className="flex gap-4 border-b border-line pb-3 text-lg">
-              <span className="w-6 shrink-0 font-mono text-sm text-accent">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              {line}
-            </li>
-          ))}
-        </ol>
+      <Section id="write" index="01" label="Write to me">
+        <div className="grid gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-8">
+            <ContactForm email={site.email} turnstileSiteKey={getEnv().TURNSTILE_SITE_KEY} />
+          </div>
+          <aside className="lg:col-span-4">
+            <h3 className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">Worth including</h3>
+            <ol className="mt-4 grid gap-3">
+              {include.map((line, index) => (
+                <li key={line} className="flex gap-3 border-b border-line pb-3 text-[15px]">
+                  <span className="w-6 shrink-0 font-mono text-sm text-accent">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  {line}
+                </li>
+              ))}
+            </ol>
+          </aside>
+        </div>
       </Section>
       <Section id="next" index="02" label="What happens next">
         <div className="grid gap-4 md:grid-cols-3">

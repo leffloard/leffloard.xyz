@@ -22,6 +22,10 @@ const LABELS: Record<string, string> = {
   "admin.owner.created": "Owner account created",
   "admin.owner.password_reset": "Password reset from the server",
   "admin.owner.second_factors_reset": "Two-step sign-in reset from the server",
+  "inbox.inquiry.deleted": "Inbox message deleted",
+  "inbox.sender.blocked": "Sender blocked",
+  "inbox.sender.unblocked": "Sender unblocked",
+  "inbox.legacy.migrated": "v1 requests copied into the inbox",
 };
 
 const WARNINGS = new Set([

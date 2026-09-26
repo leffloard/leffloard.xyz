@@ -23,11 +23,13 @@ export function Turnstile({
   action,
   nonce,
   resetKey,
+  theme = "dark",
 }: {
   siteKey: string;
   action: string;
   nonce?: string;
   resetKey?: unknown;
+  theme?: "dark" | "light" | "auto";
 }) {
   const container = useRef<HTMLDivElement>(null);
   const widget = useRef<string | null>(null);
@@ -38,13 +40,13 @@ export function Turnstile({
     widget.current = window.turnstile.render(container.current, {
       sitekey: siteKey,
       action,
-      theme: "dark",
+      theme,
       size: "flexible",
       callback: (value: string) => setToken(value),
       "expired-callback": () => setToken(""),
       "error-callback": () => setToken(""),
     });
-  }, [siteKey, action]);
+  }, [siteKey, action, theme]);
 
   useEffect(() => {
     render();

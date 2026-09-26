@@ -8,7 +8,7 @@ import {
 } from "@/app/(admin)/admin/(shell)/security/actions";
 import { AuthenticatorSecret } from "@/components/admin/authenticator-secret";
 import { RecoveryCodes } from "@/components/admin/recovery-codes";
-import { useActionRunner } from "@/components/admin/security/use-action-runner";
+import { useActionRunner } from "@/components/admin/use-action-runner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";

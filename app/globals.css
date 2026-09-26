@@ -58,6 +58,7 @@ body {
     --color-accent: oklch(0.52 0.12 222);
     --color-accent-ink: oklch(0.99 0 0);
     --color-success: oklch(0.55 0.14 155);
+    --color-danger: oklch(0.53 0.2 25);
   }
 }
 

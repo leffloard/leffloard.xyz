@@ -43,6 +43,12 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
 - Migrations in `server/db/migrations` are forward-only, additive and safe to run twice. Never edit or reorder
   one that has shipped; add a new one.
 - Secrets never go into the repository, logs, error messages or `NEXT_PUBLIC_` variables.
+- Every email and Discord message goes through the outbox (`enqueue()` in `server/notify/outbox.ts`) with a
+  `dedupeKey`; never send directly from a request (the Settings test buttons are the one exception).
+- Visitor text is untrusted: build Discord text with `discordSafe()` and email headers with `headerText()`
+  (`server/notify/escape.ts`), and show it in the admin as plain text. The webhook address is a secret.
+- Form rules live in `lib/intake/` and run in both the browser and the server; the v1 API's messages and
+  status codes stay exactly as `tests/legacy-parity.md` describes.
 - Every change comes with tests. Unit tests need no database; integration tests use the throwaway replica set
   from `tests/integration/global-setup.ts`.
 - Content scope: no case studies, marketing copy or pricing for game-modification projects or cheat loaders.

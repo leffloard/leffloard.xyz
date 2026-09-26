@@ -88,7 +88,11 @@ export type AuditAction =
   | "auth.access.denied"
   | "admin.owner.created"
   | "admin.owner.password_reset"
-  | "admin.owner.second_factors_reset";
+  | "admin.owner.second_factors_reset"
+  | "inbox.inquiry.deleted"
+  | "inbox.sender.blocked"
+  | "inbox.sender.unblocked"
+  | "inbox.legacy.migrated";
 
 export type AuditDoc = {
   _id: ObjectId;

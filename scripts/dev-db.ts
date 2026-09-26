@@ -30,6 +30,9 @@ function ensureEnvFile(): void {
         "DB_NAME=leffloard",
         "SITE_URL=http://localhost:3000",
         `DATA_ENCRYPTION_KEYS=${newEncryptionKey()}`,
+        "# Emails (alerts, replies from the inbox) are printed in the terminal instead of being sent.",
+        "# To send real ones, set the SMTP_* variables from .env.example and remove this line.",
+        "EMAIL_DELIVERY=log",
         "",
       ].join("\n"),
     );

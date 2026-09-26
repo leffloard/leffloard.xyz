@@ -1,7 +1,7 @@
 "use client";
 
 import { clearLockoutAction } from "@/app/(admin)/admin/(shell)/security/actions";
-import { useActionRunner } from "@/components/admin/security/use-action-runner";
+import { useActionRunner } from "@/components/admin/use-action-runner";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 

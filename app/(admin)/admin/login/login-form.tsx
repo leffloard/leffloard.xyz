@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useActionState } from "react";
 import { PasskeyButton } from "@/components/admin/passkey-button";
-import { Turnstile } from "@/components/admin/turnstile";
+import { Turnstile } from "@/components/ui/turnstile";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";

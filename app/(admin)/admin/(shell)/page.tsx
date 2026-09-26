@@ -10,18 +10,21 @@ import { listSessions } from "@/server/auth/sessions";
 import { toPublicUser } from "@/server/auth/users";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
+import { countNew, latestInquiries } from "@/server/inquiries/store";
+import { KIND_LABELS } from "@/lib/intake/options";
+import { channelStatus } from "@/server/notify/channels";
+import { outboxSummary } from "@/server/notify/outbox";
 import { pendingMigrations } from "@/server/db/migrate";
 import { readEnv } from "@/server/env";
 
 export const metadata = { title: "Today" };
 
 const ROADMAP = [
-  ["M2", "Public site: design system, work, services, pricing, CV"],
-  ["M3", "Inbox: project briefs, questions and revisions, with email and Discord alerts"],
   ["M4", "Going live on the VDS: backups, deploys, Cloudflare Tunnel"],
   ["M5", "Clients, projects, tasks, revisions and time tracking"],
   ["M6", "Calendar and booking"],
   ["M7", "Quotes, invoices, crypto and bank payments, finance"],
+  ["M8", "Client portal"],
 ] as const;
 
 function greeting(at: Date): string {
@@ -38,12 +41,16 @@ export default async function TodayPage() {
   const { user } = await requireAdmin();
   const db = await getDb();
   const at = now();
-  const [sessions, passkeys, pending, lastSignIns] = await Promise.all([
+  const [sessions, passkeys, pending, lastSignIns, newCount, latest, delivery] = await Promise.all([
     listSessions(db, user._id),
     listPasskeys(db, user._id),
     pendingMigrations(db),
     recentAudit(db, { prefix: "auth.login", limit: 20 }),
+    countNew(db),
+    latestInquiries(db, 5, at),
+    outboxSummary(db),
   ]);
+  const channels = channelStatus();
   const profile = toPublicUser(user);
   const warnings = readEnv().warnings;
   const failedRecently = lastSignIns.filter(
@@ -60,6 +67,50 @@ export default async function TodayPage() {
     <>
       <PageHeader title={`${greeting(at)}, ${profile.name.split(" ")[0]}`} description={date} />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Card className="md:col-span-2">
+          <CardHeader
+            title="Inbox"
+            description={newCount ? `${plural(newCount, "new message")} waiting.` : "Nothing new."}
+            action={
+              <Link
+                href="/admin/inbox"
+                className="text-[13px] text-accent underline-offset-4 hover:underline"
+              >
+                Open
+              </Link>
+            }
+          />
+          <CardBody>
+            {latest.length === 0 ? (
+              <p className="text-[13px] text-muted">
+                Messages from the contact form show up here and in the Inbox.
+              </p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {latest.map((item) => (
+                  <li key={item._id.toHexString()}>
+                    <Link
+                      href={`/admin/inbox/${item._id.toHexString()}`}
+                      className="flex min-w-0 items-baseline gap-3 py-2 text-[13px] hover:text-accent"
+                    >
+                      <span
+                        aria-hidden
+                        className={`size-1.5 shrink-0 self-center rounded-full ${item.status === "new" ? "bg-accent" : "bg-line-strong"}`}
+                      />
+                      <span className="w-40 shrink-0 truncate font-medium">{item.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-muted">{item.subject}</span>
+                      <Badge className="hidden sm:inline-flex">{KIND_LABELS[item.kind]}</Badge>
+                      <span className="shrink-0 text-xs text-muted">
+                        {formatRelative(item.receivedAt, at)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+
         <Card>
           <CardHeader title="System" description="Configuration and database." />
           <CardBody className="grid gap-2.5 text-[13px]">
@@ -69,6 +120,29 @@ export default async function TodayPage() {
               ok={pending.length === 0}
               detail={pending.length ? `${plural(pending.length, "pending migration")}` : "up to date"}
             />
+            <StatusRow
+              label="Email"
+              ok={channels.clientEmail}
+              detail={
+                channels.clientEmail
+                  ? channels.ownerEmail
+                    ? "alerts and replies"
+                    : "replies only"
+                  : "not set up"
+              }
+            />
+            <StatusRow
+              label="Discord alerts"
+              ok={channels.discord}
+              detail={channels.discord ? "on" : "off"}
+            />
+            {delivery.failed > 0 ? (
+              <StatusRow
+                label="Notifications"
+                ok={false}
+                detail={`${plural(delivery.failed, "failed message")}: see Settings`}
+              />
+            ) : null}
             {warnings.length === 0 ? (
               <StatusRow label="Configuration" ok detail="no warnings" />
             ) : (

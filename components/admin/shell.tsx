@@ -5,9 +5,11 @@ import { SignOutButton } from "@/components/admin/sign-out-button";
 
 export function AdminShell({
   user,
+  newInquiries = 0,
   children,
 }: {
   user: { name: string; email: string };
+  newInquiries?: number;
   children: ReactNode;
 }) {
   return (
@@ -19,7 +21,7 @@ export function AdminShell({
           <span className="ml-auto font-mono text-[10px] tracking-[0.08em] text-muted uppercase">admin</span>
         </div>
         <div className="flex-1 overflow-y-auto px-2 py-3">
-          <AdminNav />
+          <AdminNav newInquiries={newInquiries} />
         </div>
         <div className="border-t border-line p-3">
           <p className="truncate text-[13px] font-medium">{user.name}</p>
@@ -37,7 +39,7 @@ export function AdminShell({
               Menu
             </summary>
             <div className="absolute right-0 mt-2 w-60 rounded-lg border border-line bg-surface p-2 shadow-2xl shadow-black/50">
-              <AdminNav />
+              <AdminNav newInquiries={newInquiries} />
               <SignOutButton className="mt-2 w-full" />
             </div>
           </details>

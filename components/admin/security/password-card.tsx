@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { changePasswordAction } from "@/app/(admin)/admin/(shell)/security/actions";
-import { useActionRunner } from "@/components/admin/security/use-action-runner";
+import { useActionRunner } from "@/components/admin/use-action-runner";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
