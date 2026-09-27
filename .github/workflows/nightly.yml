@@ -115,7 +115,7 @@ jobs:
       - name: Audit all dependencies
         run: npm audit --audit-level=moderate
       - name: Scan the history for secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
