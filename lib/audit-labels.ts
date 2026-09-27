@@ -37,6 +37,9 @@ const LABELS: Record<string, string> = {
   "content.published": "Content published",
   "content.deleted": "Content deleted",
   "ai.settings.changed": "AI assistant settings changed",
+  "notifications.settings.changed": "Notification settings changed",
+  "system.errors.cleared": "Error log cleared",
+  "system.csp.cleared": "CSP reports cleared",
 };
 
 const WARNINGS = new Set([

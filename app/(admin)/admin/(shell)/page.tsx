@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AiDraft } from "@/components/admin/ai/ai-draft";
+import { SparkBars } from "@/components/admin/analytics/traffic-chart";
 import { PageHeader } from "@/components/admin/shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -31,13 +32,11 @@ import type { MeetingDoc } from "@/server/calendar/types";
 import { briefedMeetings, latestDraft } from "@/server/ai/ledger";
 import { aiDisabledReason } from "@/server/ai/settings";
 import { weekStart } from "@/lib/work/dates";
+import { trafficSummary } from "@/server/analytics/report";
 
 export const metadata = { title: "Today" };
 
-const ROADMAP = [
-  ["M11", "Analytics, notification centre, command palette"],
-  ["M12", "Security tests, load tests and launch"],
-] as const;
+const ROADMAP = [["M12", "Security tests, load tests and launch"]] as const;
 
 function greeting(at: Date): string {
   const hour = Number(
@@ -81,13 +80,14 @@ export default async function TodayPage() {
     countRequests(db, at),
     openPrivacyRequests(db),
   ]);
-  const [aiOff, review, briefed] = await Promise.all([
+  const [aiOff, review, briefed, traffic] = await Promise.all([
     aiDisabledReason(db),
     latestDraft(db, "weekly", { kind: "week", id: weekStart(today) }),
     briefedMeetings(
       db,
       meetings.map((meeting) => meeting._id),
     ),
+    trafficSummary(db, at),
   ]);
   const channels = channelStatus();
   const profile = toPublicUser(user);
@@ -244,6 +244,47 @@ export default async function TodayPage() {
 
         <Card className="md:col-span-2">
           <CardHeader
+            title="Traffic"
+            description={
+              traffic.live
+                ? `${plural(traffic.live, "visitor")} on the site in the last 30 minutes.`
+                : "Nobody on the site right now."
+            }
+            action={
+              <Link
+                href="/admin/analytics"
+                className="text-[13px] text-accent underline-offset-4 hover:underline"
+              >
+                Analytics
+              </Link>
+            }
+          />
+          <CardBody className="grid items-end gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <dl className="flex gap-6">
+              <div>
+                <dt className="text-xs text-muted">Visitors today</dt>
+                <dd className="font-mono text-xl font-semibold tabular-nums">{traffic.visitors}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted">Page views</dt>
+                <dd className="font-mono text-xl font-semibold tabular-nums">{traffic.views}</dd>
+              </div>
+            </dl>
+            <div>
+              <SparkBars
+                values={traffic.days.map((day) => day.visitors)}
+                label={`Visitors per day over the last two weeks: ${traffic.days.map((day) => `${day.label} ${day.visitors}`).join(", ")}.`}
+              />
+              <p className="mt-1 flex justify-between text-[11px] text-muted">
+                <span>{traffic.days[0]?.label}</span>
+                <span>today</span>
+              </p>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader
             title="Weekly review"
             description="The last seven days and the next seven: what happened, what needs attention, what to do next."
           />
@@ -261,7 +302,18 @@ export default async function TodayPage() {
         </Card>
 
         <Card>
-          <CardHeader title="System" description="Configuration and database." />
+          <CardHeader
+            title="System"
+            description="Configuration and database."
+            action={
+              <Link
+                href="/admin/system"
+                className="text-[13px] text-accent underline-offset-4 hover:underline"
+              >
+                Open
+              </Link>
+            }
+          />
           <CardBody className="grid gap-2.5 text-[13px]">
             <StatusRow label="Database" ok detail="connected" />
             <StatusRow

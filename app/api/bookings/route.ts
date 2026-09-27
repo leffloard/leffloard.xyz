@@ -1,4 +1,5 @@
 import { parseBookingForm } from "@/lib/booking/form";
+import { goalSoon } from "@/server/analytics/kick";
 import { honeypotFilled } from "@/lib/intake/legacy";
 import { clientIp } from "@/lib/ip";
 import { ObjectId } from "mongodb";
@@ -81,6 +82,7 @@ export async function POST(request: Request): Promise<Response> {
         };
       }
       sendQueuedSoon();
+      goalSoon(request.headers, "booking");
       const { meeting } = booked;
       manageToken = booked.token;
       return {

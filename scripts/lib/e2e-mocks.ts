@@ -1,6 +1,7 @@
 // Local stand-ins for the outside services the end-to-end tests touch:
 //   NOWPayments  /v1/invoice, /v1/payment/:id (API), /checkout/:id (its payment page), and
 //                POST /control/pay {invoiceId, status} which "pays" and sends the signed callback (IPN);
+//                POST /control/anthropic {fail} makes Claude's API refuse every request, or stop refusing;
 //   TCMB         /kurlar/today.xml and /kurlar/YYYYMM/DDMMYYYY.xml, with fixed rates on weekdays;
 //   GitHub       /github/users/leffloard/repos, two public repositories and a private one;
 //   Anthropic    /anthropic/v1/messages (streamed answers per feature, found from the prompt's task) and
@@ -153,6 +154,8 @@ export function startMocks({ port, apiKey, ipnSecret, rates, anthropicKey }: Opt
   const invoices = new Map<string, Invoice>();
   const payments = new Map<string, Record<string, unknown>>();
   let sequence = 0;
+  // Set by POST /control/anthropic: Claude's API refuses every request until it is set back.
+  let anthropicFails = false;
 
   const server = createServer((request, response) => {
     void (async () => {
@@ -233,6 +236,12 @@ export function startMocks({ port, apiKey, ipnSecret, rates, anthropicKey }: Opt
         return send(response, 200, { paymentId, ipn: { status: answer.status, body: await answer.json() } });
       }
 
+      if (path === "/control/anthropic" && request.method === "POST") {
+        const { fail } = (await readJson(request)) as { fail?: boolean };
+        anthropicFails = fail === true;
+        return send(response, 200, { fail: anthropicFails });
+      }
+
       // --- Anthropic's API ---
       if (path.startsWith("/anthropic/v1/")) {
         if (request.headers["x-api-key"] !== anthropicKey) {
@@ -251,6 +260,12 @@ export function startMocks({ port, apiKey, ipnSecret, rates, anthropicKey }: Opt
           });
         }
         if (path === "/anthropic/v1/messages" && request.method === "POST") {
+          if (anthropicFails) {
+            return send(response, 400, {
+              type: "error",
+              error: { type: "invalid_request_error", message: "The test mock refuses this request." },
+            });
+          }
           const body = await readJson(request);
           const system = (body.system as { text: string }[] | undefined) ?? [];
           const task = system.at(-1)?.text ?? "";

@@ -168,14 +168,14 @@ describe("the accountant's CSV", () => {
 
   it("writes the standard form", () => {
     expect(toCsv(header, rows, "standard")).toBe(
-      '﻿Date,Party,Amount,Rate\r\n2026-09-28,"Ada ""Countess"" Lovelace, Ltd",-1250.50,41.5012\r\n' +
+      '\ufeffDate,Party,Amount,Rate\r\n2026-09-28,"Ada ""Countess"" Lovelace, Ltd",-1250.50,41.5012\r\n' +
         '2026-09-29,"\'=HYPERLINK(""http://evil"")",0.05,\r\n',
     );
   });
 
   it("writes what Excel in Turkish opens as columns", () => {
     expect(toCsv(header, rows, "excel-tr")).toBe(
-      '﻿Date;Party;Amount;Rate\r\n2026-09-28;"Ada ""Countess"" Lovelace, Ltd";-1250,50;41,5012\r\n' +
+      '\ufeffDate;Party;Amount;Rate\r\n2026-09-28;"Ada ""Countess"" Lovelace, Ltd";-1250,50;41,5012\r\n' +
         '2026-09-29;"\'=HYPERLINK(""http://evil"")";0,05;\r\n',
     );
   });

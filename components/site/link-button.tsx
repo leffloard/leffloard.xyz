@@ -31,7 +31,9 @@ export function LinkButton({
     className,
   );
   const external = /^(https?:|mailto:)/.test(href);
-  return external ? (
+  // A file (/cv.pdf) is a plain link: Next's router would fetch and prefetch it as a page first.
+  const file = /\.[a-z0-9]{2,4}$/i.test(href);
+  return external || file ? (
     <a href={href} className={classes} {...(href.startsWith("http") ? { rel: "noopener noreferrer" } : {})}>
       {children}
     </a>

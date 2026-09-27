@@ -4,6 +4,7 @@ import { now } from "@/server/clock";
 import type { Delivery } from "@/server/inquiries/types";
 import { log } from "@/server/log";
 import { readChannels, type Channels } from "@/server/notify/channels";
+import { quietHoursEnd } from "@/server/notify/settings";
 import { postDiscord, type DiscordPoster } from "@/server/notify/discord";
 import { sendEmail, type MailSender } from "@/server/notify/email";
 import type { DiscordPayload, EmailMessage } from "@/server/notify/templates";
@@ -42,6 +43,7 @@ export type OutboxDoc = OutboxItem & {
   createdAt: Date;
   sentAt: Date | null;
   purgeAt: Date; // messages contain personal data: kept 30 days for the delivery log
+  quietHours?: true; // an alert for the owner: held during the owner's quiet hours, retries included
 };
 
 const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 3600_000, 12 * 3600_000];
@@ -54,18 +56,30 @@ export function outbox(db: Db) {
   return db.collection<OutboxDoc>("outbox");
 }
 
-export type EnqueueInput = OutboxItem & { dedupeKey: string; label: string; ref?: OutboxRef };
+export type EnqueueInput = OutboxItem & {
+  dedupeKey: string;
+  label: string;
+  ref?: OutboxRef;
+  // Not sent before then (the owner's quiet hours).
+  notBefore?: Date | null;
+  // Held during the owner's quiet hours whenever it is due (alerts for the owner).
+  quietHours?: boolean;
+};
 
 // Returns the new item's id, or null when an item with the same dedupeKey exists.
-export async function enqueue(db: Db, input: EnqueueInput): Promise<ObjectId | null> {
+export async function enqueue(
+  db: Db,
+  { notBefore, quietHours, ...input }: EnqueueInput,
+): Promise<ObjectId | null> {
   const at = now();
   const doc = {
     _id: new ObjectId(),
     ...input,
+    ...(quietHours ? { quietHours: true } : {}),
     ref: input.ref ?? null,
     status: "pending",
     attempts: 0,
-    nextAttemptAt: at,
+    nextAttemptAt: notBefore && notBefore > at ? notBefore : at,
     lockedUntil: null,
     lastError: null,
     createdAt: at,
@@ -144,17 +158,36 @@ async function deliver(item: OutboxDoc, senders: Senders): Promise<"sent" | "ski
   return "sent";
 }
 
-export type DrainSummary = { sent: number; skipped: number; retrying: number; failed: number };
+export type DrainSummary = { sent: number; skipped: number; retrying: number; failed: number; held: number };
 
 export async function drainOutbox(
   db: Db,
   { senders = defaultSenders, limit = 25 }: { senders?: Senders; limit?: number } = {},
 ): Promise<DrainSummary> {
-  const summary: DrainSummary = { sent: 0, skipped: 0, retrying: 0, failed: 0 };
+  const summary: DrainSummary = { sent: 0, skipped: 0, retrying: 0, failed: 0, held: 0 };
+  // When the owner's current quiet period ends (read once, when an alert for the owner comes up).
+  let quiet: Date | null = null;
+  let quietRead = false;
   for (let count = 0; count < limit; count++) {
-    const item = await claim(db, now());
+    const at = now();
+    const item = await claim(db, at);
     if (!item) break;
     const mine = { _id: item._id, status: "sending" as const };
+    if (item.quietHours) {
+      if (!quietRead) {
+        quiet = await quietHoursEnd(db, at);
+        quietRead = true;
+      }
+      if (quiet && quiet > at) {
+        // Queued before the quiet period began, or a retry that fell into it: it waits for the end.
+        await outbox(db).updateOne(mine, {
+          $set: { status: "pending", lockedUntil: null, nextAttemptAt: quiet },
+          $inc: { attempts: -1 },
+        });
+        summary.held++;
+        continue;
+      }
+    }
     try {
       const result = await deliver(item, senders);
       if (result === "sent") {

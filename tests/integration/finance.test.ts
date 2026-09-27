@@ -358,7 +358,7 @@ describe("the finance report", () => {
       format: "standard",
     });
     expect({ rows, missing }).toEqual({ rows: 5, missing: 0 });
-    const lines = csv.replace("﻿", "").trim().split("\r\n");
+    const lines = csv.replace("\ufeff", "").trim().split("\r\n");
     expect(lines[0]).toBe(
       "Date,Type,Document,Party,Description,Category,Method,Reference,Currency,Amount,TCMB bulletin,TCMB rate (TRY),Amount (TRY)",
     );

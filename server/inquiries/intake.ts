@@ -8,8 +8,8 @@ import { insertInquiry } from "@/server/inquiries/store";
 import type { InquiryDoc, InquirySource } from "@/server/inquiries/types";
 import { log } from "@/server/log";
 import { readChannels, type Channels } from "@/server/notify/channels";
-import { enqueue } from "@/server/notify/outbox";
-import { discordPayload, ownerAlertEmail } from "@/server/notify/templates";
+import { alertOwner } from "@/server/notify/owner";
+import { discordPayload, inquiryAlertTitle, ownerAlertEmail } from "@/server/notify/templates";
 
 // A validated message from the contact form or the v1 API: stored, then announced on the configured
 // channels. Sending happens later, from the outbox, so a slow or broken channel never fails the visitor.
@@ -49,24 +49,16 @@ export async function queueAlerts(
   inquiry: InquiryDoc,
   { siteUrl, channels }: { siteUrl: string | null; channels: Channels },
 ): Promise<void> {
-  const ref = { inquiryId: inquiry._id };
   const id = inquiry._id.toHexString();
-  if (channels.discordWebhookUrl) {
-    await enqueue(db, {
-      channel: "discord",
-      payload: discordPayload(inquiry, siteUrl),
-      dedupeKey: `inquiry:${id}:discord`,
-      label: `Discord alert for ${inquiry.ref}`,
-      ref,
-    });
-  }
-  if (channels.ownerEmail) {
-    await enqueue(db, {
-      channel: "email",
-      payload: ownerAlertEmail(inquiry, { to: channels.ownerEmail, siteUrl }),
-      dedupeKey: `inquiry:${id}:owner-email`,
-      label: `Email alert for ${inquiry.ref}`,
-      ref,
-    });
-  }
+  await alertOwner(db, channels, {
+    kind: "inquiry",
+    key: `inquiry:${id}`,
+    label: `Alert for ${inquiry.ref}`,
+    title: `${inquiryAlertTitle(inquiry.kind)} from ${inquiry.name}`,
+    body: inquiry.subject,
+    href: `/admin/inbox/${id}`,
+    ref: { inquiryId: inquiry._id },
+    discord: () => discordPayload(inquiry, siteUrl),
+    email: (to) => ownerAlertEmail(inquiry, { to, siteUrl }),
+  });
 }

@@ -46,6 +46,10 @@ const TITLES: Record<InquiryKind, string> = {
   call: "New call request",
 };
 
+export function inquiryAlertTitle(kind: InquiryKind): string {
+  return TITLES[kind];
+}
+
 // How the visitor's own emails name what they sent.
 const VISITOR_LABELS: Record<InquiryKind, string> = {
   brief: "project brief",

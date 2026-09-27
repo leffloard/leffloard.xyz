@@ -10,6 +10,7 @@ import { countRequests } from "@/server/calendar/meetings";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
 import { countNew } from "@/server/inquiries/store";
+import { countUnread } from "@/server/notify/owner";
 import { projectChoices } from "@/server/projects/store";
 import { taskCounts } from "@/server/tasks/store";
 import { runningTimer } from "@/server/time/store";
@@ -21,16 +22,18 @@ export default async function ShellLayout({ children }: { children: React.ReactN
   const db = await getDb();
   const at = now();
   const today = todayIn(ADMIN_TIME_ZONE, at);
-  const [passkeys, newInquiries, tasks, requests, overdue, review, running, projects] = await Promise.all([
-    listPasskeys(db, user._id),
-    countNew(db),
-    taskCounts(db, today),
-    countRequests(db, at),
-    countOverdue(db, today),
-    countReview(db),
-    runningTimer(db),
-    projectChoices(db),
-  ]);
+  const [passkeys, newInquiries, tasks, requests, overdue, review, running, projects, unread] =
+    await Promise.all([
+      listPasskeys(db, user._id),
+      countNew(db),
+      taskCounts(db, today),
+      countRequests(db, at),
+      countOverdue(db, today),
+      countReview(db),
+      runningTimer(db),
+      projectChoices(db),
+      countUnread(db),
+    ]);
   const timer = {
     running: running
       ? {
@@ -49,6 +52,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
         user={{ name: user.name, email: user.email }}
         counts={{ inbox: newInquiries, tasks: tasks.today, calendar: requests, billing: overdue + review }}
         timer={timer}
+        unread={unread}
       >
         {children}
       </AdminShell>

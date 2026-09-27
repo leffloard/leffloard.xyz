@@ -3,6 +3,7 @@ import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { Analytics } from "@/components/site/analytics";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +17,8 @@ export default async function GlobalNotFound() {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>
-        <main className="mx-auto flex min-h-dvh max-w-3xl flex-col justify-center gap-6 px-6">
+        {/* data-not-found: the visitor statistics count the address as a broken link. */}
+        <main data-not-found className="mx-auto flex min-h-dvh max-w-3xl flex-col justify-center gap-6 px-6">
           <p className="font-mono text-xs tracking-[0.08em] text-muted uppercase">Error 404</p>
           <h1 className="text-5xl font-semibold tracking-tight">This page does not exist.</h1>
           <p className="text-lg text-muted">
@@ -25,6 +27,7 @@ export default async function GlobalNotFound() {
             </Link>
           </p>
         </main>
+        <Analytics />
       </body>
     </html>
   );

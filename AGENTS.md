@@ -44,7 +44,9 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
   one that has shipped; add a new one.
 - Secrets never go into the repository, logs, error messages or `NEXT_PUBLIC_` variables.
 - Every email and Discord message goes through the outbox (`enqueue()` in `server/notify/outbox.ts`) with a
-  `dedupeKey`; never send directly from a request (the Settings test buttons are the one exception).
+  `dedupeKey`; never send directly from a request (the Settings test buttons are the one exception). Alerts
+  for the owner go through `alertOwner()` (`server/notify/owner.ts`), never `enqueue()` directly: it records
+  the notification and applies the routes and quiet hours.
 - Visitor text is untrusted: build Discord text with `discordSafe()` and email headers with `headerText()`
   (`server/notify/escape.ts`), and show it in the admin as plain text. The webhook address is a secret.
 - Form rules live in `lib/intake/` and run in both the browser and the server; the v1 API's messages and
@@ -97,3 +99,11 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
   free of dates, ids and anything else that changes per request (they are cached). Prices in AI drafts come
   from the catalogue, never from the model. Tests use `tests/helpers/anthropic.ts` (a stubbed fetch) and
   never call Anthropic.
+- Visitor statistics store no address and set no cookie: the only visitor id is `visitorId()` with the day's
+  salt (`server/analytics/visitor.ts`), which is never backed up or logged. Count public pages only (never a
+  private path, which may hold a secret link), respect Do Not Track and Global Privacy Control, and record
+  goals on the server with `goalSoon()`, never from the browser.
+- A new admin page gets a command in `lib/admin/commands.ts` (a unit test checks every command's page
+  exists). Shortcuts are two keys after `g` or `c`; `j`, `k`, `x`, `n` and `/` belong to the pages' lists.
+- `log.error` lines are shown on the System page (after redaction): name what failed, and don't put secrets
+  or visitor text in the message.

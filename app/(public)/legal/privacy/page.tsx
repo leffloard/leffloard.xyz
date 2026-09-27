@@ -59,10 +59,19 @@ export default function PrivacyPage() {
           <strong>Technical data</strong> needed to run the site securely: IP address, browser type and the
           time of a request, used for rate limits, abuse prevention and security logs.
         </li>
+        <li>
+          <strong>Visit statistics</strong>: which pages were viewed, the site or campaign tag a visit came
+          from, the country (as Cloudflare sees it), whether the browser window is phone, tablet or desktop
+          sized, how fast the pages loaded, and whether a visit ended in a message, a booking or a CV
+          download. No IP address is stored. A visitor is counted with a one-way hash of that day&apos;s
+          random value, the IP address and the browser type; the day&apos;s value is deleted soon after the
+          day ends, after which the hash can&apos;t be linked to anyone. Nothing is counted when your browser
+          sends Do Not Track or Global Privacy Control.
+        </li>
       </ul>
       <p>
-        There are no advertising or tracking cookies. The only cookies are the ones that keep you signed in to
-        the admin or the client portal.
+        There are no advertising or tracking cookies, and the visit statistics use none. The only cookies are
+        the ones that keep you signed in to the admin or the client portal.
       </p>
       <h2>Why, and on what legal basis</h2>
       <ul>
@@ -85,6 +94,10 @@ export default function PrivacyPage() {
           it down.
         </li>
         <li>To keep the site secure: my legitimate interest in preventing abuse.</li>
+        <li>
+          To see which pages are useful and keep the site fast, with statistics that can&apos;t identify you:
+          my legitimate interest.
+        </li>
       </ul>
       <h2>Who processes it for me</h2>
       <p>These services process data on my behalf. Some of them store or process data outside Turkey.</p>
@@ -124,8 +137,10 @@ export default function PrivacyPage() {
         invitation after 7 days); a portal sign-in ends after 7 days without use and is deleted at the latest
         30 days after it started. Project updates and your data requests are kept with your client record.
         Drafts written with the AI assistant are deleted after 90 days, or earlier with the message they are
-        about; its short summary of a message is kept, and deleted, with the message. A testimonial stays on
-        the site until the person asks me to take it down.
+        about; its short summary of a message is kept, and deleted, with the message. Single page views are
+        kept for 60 days and page loading times for 90 days; the daily totals made from them say nothing about
+        any one visitor and are kept. A testimonial stays on the site until the person asks me to take it
+        down.
       </p>
       <h2>Your rights</h2>
       <p>

@@ -78,6 +78,11 @@ export function isPrivatePath(pathname: string): boolean {
   return under(pathname, PRIVATE_PREFIXES);
 }
 
-export function usesNonce(pathname: string): boolean {
+// Whether an address is in one of the site's page sections (it may still be a 404 inside one).
+export function inPageSection(pathname: string): boolean {
   return pathname === "/" || under(pathname, PAGE_PREFIXES);
+}
+
+export function usesNonce(pathname: string): boolean {
+  return inPageSection(pathname);
 }

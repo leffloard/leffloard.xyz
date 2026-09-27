@@ -284,6 +284,10 @@ const OWNER_TITLES: Record<OwnerEvent, string> = {
   cancelled: "Booking cancelled",
 };
 
+export function ownerEventTitle(event: OwnerEvent): string {
+  return OWNER_TITLES[event];
+}
+
 const COLORS: Record<OwnerEvent, number> = {
   booked: 0x22d3ee,
   requested: 0xf59e0b,

@@ -29,8 +29,10 @@ app/                      Routes (App Router)
     (shell)/              Signed-in pages: Today, Inbox, Calendar, Tasks, Projects, Clients, Billing (quotes,
                           invoices, recurring, payments, settings), Finance (overview, expenses, rates,
                           export), Time, Content (work, blog, services, testimonials, profile, CV,
-                          pricing terms, media, GitHub, leak check), Security, Settings
+                          pricing terms, media, GitHub, leak check), Analytics, AI, Notifications,
+                          Security, Settings, System
   api/inquiries/route.ts  The contact form's endpoint
+  api/analytics/route.ts  The public site's visitor statistics (page views and loading timings)
   api/bookings/           Booking a call, and the open times of a booking type
   api/meetings/[token]/   The guest's link: open times, reschedule, cancel
   api/calendar/feed/      The owner's private calendar feed (iCalendar)
@@ -61,6 +63,12 @@ lib/                      Pure helpers usable anywhere: TOTP, base32, IP keys, C
   portal/                 The portal's form rules
   content/                The content's schemas (one per kind), the editor's field lists, the public types,
                           and the leak check
+  ai/                     The AI assistant's features, prices, budget arithmetic and answer schemas
+  analytics/              Visitor statistics: what the tracker sends and how it is cleaned, devices, goals,
+                          Web Vitals thresholds, ranges
+  notifications/          Alert kinds, routes, quiet hours (when the current quiet period ends), the
+                          settings form
+  admin/commands.ts       The command palette's commands and the keyboard shortcuts
 server/                   Server-only code (every file imports "server-only")
   env.ts                  Validated configuration, plain-English errors
   boot.ts                 Runs once at start-up (via instrumentation.ts); stops on bad config
@@ -88,7 +96,16 @@ server/                   Server-only code (every file imports "server-only")
                           project updates, data requests, its emails and the owner's alerts
   pdf/                    The fonts every generated PDF uses
   work/collections.ts     The work modules' collections, so their stores do not import each other
-  notify/                 Notification channels, templates, escaping, the outbox, SMTP and Discord senders
+  notify/                 Notification channels, templates, escaping, the outbox, SMTP and Discord senders;
+                          the owner's alerts and notification centre, their settings, the daily digest
+  ai/                     The AI assistant: the SDK client, settings, the budget ledger, prompts, the
+                          features and the one function every request goes through
+  analytics/              Visitor statistics: the daily salt and visitor ids, recording views, timings and
+                          goals, the nightly day sums and the reports
+  search/everything.ts    The command palette's search across messages, clients, projects, tasks, quotes,
+                          invoices, meetings and content
+  system/                 The System page: the database and release, the integrations, CSP reports, the
+                          error log fed by the logger
   jobs/                   Background jobs inside the server process (croner), with once-per-period runs
   backup/                 Encrypted backups (gzip + AES-256-GCM), restore with a check first
   db/client.ts            One MongoClient per process
@@ -302,6 +319,23 @@ Every email and Discord message leaves through the outbox (`server/notify/outbox
 3. A sender claims a message before sending, so two processes never send the same one. A failure is retried
    after 1, 5 and 30 minutes, then 2 and 12 hours; after six attempts it is marked failed and shown in
    Settings, where it can be retried.
+
+Alerts for the owner (a new message, a booking, a quote answer, a payment, a portal request, a problem) go
+through `alertOwner()` (`server/notify/owner.ts`) instead of the outbox directly:
+
+- Each one is stored in `notifications` (one per event, kept 90 days) and shows at once in the admin's
+  notification centre: a bell with the unread count in the shell, and `/admin/notifications`, where opening
+  one marks it read and goes to what it is about.
+- The notification settings (one `settings` document) route each kind to email and Discord (both by
+  default), and set quiet hours: periods on chosen days, which may run past midnight. During one, the
+  outbox item is queued with `notBefore` set to when the quiet period ends (`quietUntil()` in
+  `lib/notifications/model.ts` follows periods that continue each other, the night and then school), so it
+  goes out then instead of being dropped. The outbox checks again before each attempt, so an alert queued
+  just before a quiet period, or a retry that falls into one, waits too.
+- The daily digest (`server/notify/digest.ts`) is a morning email: today's calls, tasks due or late, new
+  messages, overdue invoices and payments to review, projects due within a week, and yesterday's visits. The
+  `digest` job looks every minute and sends it once a day from the chosen time; the Notifications page
+  previews it and sends it on demand.
 
 Visitor text is escaped for each channel, with v1's rules (`server/notify/escape.ts`): Discord Markdown,
 links and mentions are neutralised and `allowed_mentions` is empty; email header text is kept on one line and
@@ -586,6 +620,39 @@ collections.
   studies show their repository's stars and last update. A repository made private or deleted leaves the
   list at the next sync.
 
+## Visitor statistics
+
+`/admin/analytics` counts visits to the public site (M11) without cookies, stored addresses or a third
+party:
+
+- **The tracker** (`components/site/analytics.tsx`, in the public layout) sends one small beacon per page
+  view to `POST /api/analytics`: the path, whether the page load started there (then the referrer and the
+  `utm_source`, `utm_campaign` or `ref` tags), the window's size class and whether the page was the 404.
+  When the visitor leaves a page load, its Web Vitals (LCP, INP, CLS, FCP, TTFB) follow. Nothing is sent on
+  private pages (the portal, quote, invoice and meeting links), or when the browser sends Do Not Track or
+  Global Privacy Control.
+- **The collector** answers 204 whatever happens. It drops cross-site posts, bots and prefetches, the
+  owner's own visits (a signed-in admin or preview cookie), private and non-page paths, anything outside
+  the two message shapes, and floods: 120 per address every ten minutes and 20,000 a day for the whole site,
+  both counted in memory so a page view costs one database write, and a flood can't fill a small database.
+  An address outside the site's sections (the "page does not exist" page for any unknown address, which
+  carries the tracker too) is recorded as a broken link, whatever the browser says.
+- **Visitors** are a hash of a random salt made each day, the address (IPv6 by /64), the browser and the
+  host: one visitor within a day, a stranger the next. The salt lives in `analytics_salts` until an hour
+  after its day ends (TTL) and is never backed up, so a day's ids can't be traced back afterwards. No
+  address is stored. The country comes from Cloudflare's header, only behind Cloudflare.
+- **Goals** (a message sent, a call booked, the CV downloaded) are recorded by the server when they happen
+  (`goalSoon()`), with the visitor's id, and never accepted from the browser.
+- **Storage.** Single views are kept 60 days and loading timings 90 days. Each finished day is summed once,
+  day by day, into `analytics_days` by the nightly `analytics` job (visitors, views, one-page visits, goals,
+  and the top pages, sources, campaigns, countries, devices and broken links), and the sums are kept. Only
+  each day's top rows leave the database (`$topN`): visitors choose the paths and tags they send, and an
+  aggregation's answer must fit in one 16 MB document. Because ids
+  change daily, adding the days' distinct visitors gives exactly the distinct visitors of a longer span.
+  Reports read the sums, and today (or a day the job hasn't reached) from the single views.
+- **Loading speed** is read at the 75th percentile, with Google's thresholds, overall and for the pages with
+  the most measurements. The Today page shows today's visitors, the last 30 minutes and two weeks of days.
+
 ## AI assistant
 
 Claude helps with the owner's writing (M10): it triages inbox messages, drafts replies, quotes, meeting
@@ -657,12 +724,27 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
   was due while the server was off runs at the next check.
 - **Backups** (`server/backup`) are NDJSON exports (canonical Extended JSON, so every BSON type survives),
   gzipped and encrypted with AES-256-GCM under `BACKUP_KEY`, with the plain header authenticated too.
-  Sessions, rate limits, the delivery log and the migration records are left out; a restore runs the
+  Sessions, rate limits, the delivery log, the migration records and the visitor statistics' daily salt
+  are left out; a restore runs the
   migrations, which also rebuild the indexes. A restore decrypts and checks the whole file before writing
   anything, refuses a database that is not empty unless told to replace it, and compares every collection
   with the backup's own counts. `npm run restore -- <file> --check` is the monthly drill.
 - **Health.** `/api/health?deep=1` reports configuration, database and migrations (these decide a deploy)
   and, for information, whether the last backup is recent.
+- **The System page** (`/admin/system`) shows the database (answer time, migrations, storage by collection,
+  against the 512 MB of Atlas's free cluster), the release, which integrations are set up, the background
+  jobs, the backups (with "Back up now"), the error log and the Content Security Policy reports. A failed
+  nightly backup is also an alert (once a day).
+- **The error log.** Once the server has started, every line logged at error level also goes, after the
+  logger's redaction, to `error_log` (kept 30 days): the message, the error's type, message and stack, and
+  a few context fields. The sink is kept on `globalThis`, like the database client: Next.js bundles
+  `instrumentation.ts` apart from the routes, so each has its own copy of the logger's module. Storing is best effort and sampled (30 a minute), and a failure to store is never
+  logged, so a database outage can't cause a loop of errors about errors. Clearing it, or the CSP reports,
+  needs "confirm it's you" and is written to the audit log.
+- **The command palette.** Ctrl/Cmd+K anywhere in the admin opens a search box (an ARIA combobox) over the
+  pages and "new" actions in `lib/admin/commands.ts` and, from two characters, the records whose names
+  contain the text (`searchEverything()`). Two-key shortcuts (`g` to go, `c` to create) and `?` for the list
+  are read before the page's own keys, and never while typing in a field.
 
 ## Testing
 
@@ -681,8 +763,9 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
   the admin's pages are checked with axe as the tests go through them.
 - Admin tests that share data run in order: the sign-in tests, then the inbox and settings, then the work
   modules, then booking and the calendar, then billing, then the portal, then the content editor, which
-  changes what public pages show, then the AI assistant (Playwright project dependencies in
-  `playwright.config.ts`). The calendar tests book as visitors in London and New York, and check the invites
+  changes what public pages show, then the AI assistant, then the visitor statistics, notifications,
+  command palette and System page (Playwright project dependencies in `playwright.config.ts`). The
+  statistics test visits with its own address, so the per-address limit isn't shared with the suite. The calendar tests book as visitors in London and New York, and check the invites
   the emails carry; the billing tests go from a quote to a crypto payment, a bank transfer and its refund, a
   care plan, an expense and the accountant's CSV; the portal tests go from the owner's invitation to the
   client's sign-in, revision rounds (one of them extra), a data request and the owner's answer.
@@ -764,8 +847,8 @@ Every direct dependency and why it is here.
    dependency, because it is small, stable and security-critical enough to be read in full.
 9. **Content in code before the CMS.** The public site needed real content before the admin can edit it;
    typed files in `content/` are reviewed like code and move into the database in M9.
-10. **No third-party scripts on public pages** (fonts are self-hosted, no analytics tags); Cloudflare
-    Turnstile on forms is the only exception.
+10. **No third-party scripts on public pages** (fonts are self-hosted, and the visitor statistics are the
+    site's own); Cloudflare Turnstile on forms is the only exception.
 11. **An outbox for every outgoing message.** v1 sent alerts in a background task and only logged failures;
     a stored, deduplicated and retried message survives a slow mail server or a restart.
 12. **Replies arrive in the owner's mailbox, not in the app.** Emails to visitors set Reply-To to
@@ -839,3 +922,15 @@ Every direct dependency and why it is here.
     model chose, so the model can't set one.
 37. **Client text is marked as data, and opting out means never sent.** The form's "no AI tools" choice is
     honoured before any request is built, not by asking the model to ignore the text.
+38. **First-party, cookie-less statistics instead of an analytics service** (M11). The numbers a freelancer
+    needs (visitors, pages, where they came from, what they did, how fast pages load) don't need a third
+    party, a cookie banner or a stored address; a daily salt that is then deleted keeps visitor ids useful
+    for a day and useless after.
+39. **Day sums instead of every visit forever.** Atlas's free cluster holds 512 MB; single visits are kept
+    two months, and the sums, which hold no ids and are exact thanks to the daily salt, keep the years.
+40. **One way to alert the owner.** `alertOwner()` records the notification, routes it and applies quiet
+    hours in one place, so a new kind of alert can't forget any of them, and a quiet period delays alerts
+    instead of losing them.
+41. **The error log is fed by the logger, not by each caller.** Every `log.error` already names what failed;
+    copying those lines (after redaction, sampled, best effort) shows problems on the System page without a
+    second error-reporting path to keep in step.

@@ -2,11 +2,14 @@ import "server-only";
 import type { Db, ObjectId } from "mongodb";
 import type { BookingDetails } from "@/lib/booking/form";
 import { offersSlot } from "@/lib/booking/slots";
+import { ADMIN_TIME_ZONE } from "@/lib/format";
+import { describeMoment } from "@/lib/intake/time";
 import { bookingPath, getBookingType } from "@/server/calendar/booking-types";
 import {
   bookedEmail,
   cancelledEmail,
   declinedEmail,
+  ownerEventTitle,
   ownerMeetingDiscord,
   ownerMeetingEmail,
   reminderEmail,
@@ -33,6 +36,7 @@ import { now } from "@/server/clock";
 import { log } from "@/server/log";
 import type { Channels } from "@/server/notify/channels";
 import { enqueue } from "@/server/notify/outbox";
+import { alertOwner } from "@/server/notify/owner";
 import type { EmailMessage } from "@/server/notify/templates";
 import { clients } from "@/server/work/collections";
 
@@ -88,26 +92,18 @@ async function toGuest(
 }
 
 async function toOwner(db: Db, meeting: MeetingDoc, notify: NotifyContext, event: OwnerEvent) {
-  const key = `meeting:${meeting._id.toHexString()}:owner-${event}:${meeting.sequence}`;
-  const label = `${event[0]!.toUpperCase()}${event.slice(1)} alert for ${meeting.title} with ${meeting.name}`;
-  if (notify.channels.ownerEmail) {
-    await enqueue(db, {
-      channel: "email",
-      payload: ownerMeetingEmail(meeting, event, { to: notify.channels.ownerEmail, siteUrl: notify.siteUrl }),
-      dedupeKey: `${key}:email`,
-      label,
-      ref: { meetingId: meeting._id },
-    });
-  }
-  if (notify.channels.discordWebhookUrl) {
-    await enqueue(db, {
-      channel: "discord",
-      payload: ownerMeetingDiscord(meeting, event, notify.siteUrl),
-      dedupeKey: `${key}:discord`,
-      label,
-      ref: { meetingId: meeting._id },
-    });
-  }
+  const id = meeting._id.toHexString();
+  await alertOwner(db, notify.channels, {
+    kind: "meeting",
+    key: `meeting:${id}:owner-${event}:${meeting.sequence}`,
+    label: `${event[0]!.toUpperCase()}${event.slice(1)} alert for ${meeting.title} with ${meeting.name}`,
+    title: `${ownerEventTitle(event)}: ${meeting.title} with ${meeting.name}`,
+    body: describeMoment(meeting.startsAt, ADMIN_TIME_ZONE),
+    href: `/admin/calendar/meetings/${id}`,
+    ref: { meetingId: meeting._id },
+    email: (to) => ownerMeetingEmail(meeting, event, { to, siteUrl: notify.siteUrl }),
+    discord: () => ownerMeetingDiscord(meeting, event, notify.siteUrl),
+  });
 }
 
 async function rebookUrl(db: Db, meeting: MeetingDoc, siteUrl: string): Promise<string | null> {

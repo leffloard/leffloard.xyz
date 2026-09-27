@@ -491,4 +491,39 @@ export const migrations: Migration[] = [
         .createIndex({ aiOptOut: 1 }, { name: "ai_opt_out", partialFilterExpression: { aiOptOut: true } });
     },
   },
+  {
+    id: "0012",
+    name: "analytics",
+    async up(db) {
+      // Visitor statistics (server/analytics): single visits for 60 days, loading timings for 90 days, the
+      // day's salt until an hour after its day. The day sums (analytics_days) are kept.
+      const events = db.collection("analytics_events");
+      await events.createIndex({ at: 1 }, { expireAfterSeconds: 60 * 24 * 3600 });
+      await events.createIndex({ day: 1, type: 1 });
+      await db.collection("analytics_vitals").createIndex({ at: 1 }, { expireAfterSeconds: 90 * 24 * 3600 });
+      await db.collection("analytics_salts").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    },
+  },
+  {
+    id: "0013",
+    name: "notification-centre",
+    async up(db) {
+      // The admin's notifications (server/notify/owner.ts): one per event, kept 90 days.
+      const notifications = db.collection("notifications");
+      await notifications.createIndex({ key: 1 }, { unique: true });
+      await notifications.createIndex({ createdAt: -1 });
+      await notifications.createIndex({ readAt: 1, createdAt: -1 });
+      await notifications.createIndex({ purgeAt: 1 }, { expireAfterSeconds: 0 });
+    },
+  },
+  {
+    id: "0014",
+    name: "error-log",
+    async up(db) {
+      // The System page's error log (server/system/errors.ts), kept 30 days.
+      const errors = db.collection("error_log");
+      await errors.createIndex({ purgeAt: 1 }, { expireAfterSeconds: 0 });
+      await errors.createIndex({ at: -1 });
+    },
+  },
 ];

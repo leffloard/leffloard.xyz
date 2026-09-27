@@ -19,7 +19,7 @@ import { forgetContent } from "@/server/content/snapshot";
 import { bumpGeneration } from "@/server/content/store";
 import type { ContentDoc, ContentVersionDoc } from "@/server/content/types";
 import { inTransaction } from "@/server/db/transaction";
-import { enqueue } from "@/server/notify/outbox";
+import { alertOwner } from "@/server/notify/owner";
 import type { Channels } from "@/server/notify/channels";
 import { discordSafe, headerText } from "@/server/notify/escape";
 
@@ -467,22 +467,22 @@ export async function publishDue(
     const text = scheduleProblemText(title, result);
     const url = `${notify.siteUrl}/admin/content/${doc.kind}/${doc._id.toHexString()}`;
     const key = `content:schedule:${doc._id.toHexString()}:${doc.publishAt?.toISOString()}`;
-    if (notify.channels.ownerEmail) {
-      await enqueue(db, {
-        channel: "email",
-        payload: {
-          to: [{ address: notify.channels.ownerEmail }],
+    await alertOwner(
+      db,
+      notify.channels,
+      {
+        kind: "problem",
+        key,
+        label: `Scheduled publishing failed: ${title}`,
+        title: `Scheduled publishing failed: ${title}`,
+        body: text,
+        href: `/admin/content/${doc.kind}/${doc._id.toHexString()}`,
+        email: (to) => ({
+          to: [{ address: to }],
           subject: headerText(`Scheduled publishing failed: ${title}`),
           text: `${text}\n\nOpen it: ${url}\n`,
-        },
-        dedupeKey: `${key}:email`,
-        label: `Scheduled publishing failed: ${title}`,
-      });
-    }
-    if (notify.channels.discordWebhookUrl) {
-      await enqueue(db, {
-        channel: "discord",
-        payload: {
+        }),
+        discord: () => ({
           embeds: [
             {
               title: "Scheduled publishing failed",
@@ -495,11 +495,10 @@ export async function publishDue(
             },
           ],
           allowed_mentions: { parse: [] },
-        },
-        dedupeKey: `${key}:discord`,
-        label: `Scheduled publishing failed: ${title}`,
-      });
-    }
+        }),
+      },
+      at,
+    );
   }
   return { published, failed };
 }

@@ -3,6 +3,7 @@ import type { Db } from "mongodb";
 import type { ClientDoc } from "@/server/clients/types";
 import type { Channels } from "@/server/notify/channels";
 import { enqueue } from "@/server/notify/outbox";
+import { alertOwner } from "@/server/notify/owner";
 import {
   inviteEmail,
   portalAlertDiscord,
@@ -93,27 +94,27 @@ export async function alertPortalEvent(
   at: Date,
 ): Promise<void> {
   const id = event.kind === "revision" ? event.revision._id : event.request._id;
-  const key = `portal:${event.kind}:${id.toHexString()}`;
   const label =
     event.kind === "revision"
       ? `Revision asked for in the portal: ${event.project.ref}`
       : `Data request in the portal: ${client.name}`;
-  if (notify.channels.ownerEmail) {
-    await enqueue(db, {
-      channel: "email",
-      payload: portalAlertEmail(client, event, { to: notify.channels.ownerEmail, siteUrl: notify.siteUrl }),
-      dedupeKey: `${key}:email`,
+  await alertOwner(
+    db,
+    notify.channels,
+    {
+      kind: "portal",
+      key: `portal:${event.kind}:${id.toHexString()}`,
       label,
+      title: label,
+      body: event.kind === "revision" ? `${client.name}: ${event.revision.title}` : null,
+      href:
+        event.kind === "revision"
+          ? `/admin/projects/${event.project._id.toHexString()}/revisions`
+          : `/admin/clients/${client._id.toHexString()}`,
       ref: { clientId: client._id },
-    });
-  }
-  if (notify.channels.discordWebhookUrl) {
-    await enqueue(db, {
-      channel: "discord",
-      payload: portalAlertDiscord(client, event, notify.siteUrl, at),
-      dedupeKey: `${key}:discord`,
-      label,
-      ref: { clientId: client._id },
-    });
-  }
+      email: (to) => portalAlertEmail(client, event, { to, siteUrl: notify.siteUrl }),
+      discord: () => portalAlertDiscord(client, event, notify.siteUrl, at),
+    },
+    at,
+  );
 }

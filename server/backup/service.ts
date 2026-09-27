@@ -7,6 +7,9 @@ import { createBackup, listBackups, type BackupFile } from "@/server/backup/back
 import { now } from "@/server/clock";
 import { getEnv, type Env } from "@/server/env";
 import { jobs, runJob, type JobDoc, type JobOutcome } from "@/server/jobs/runner";
+import type { Channels } from "@/server/notify/channels";
+import { discordSafe } from "@/server/notify/escape";
+import { alertOwner } from "@/server/notify/owner";
 
 // The nightly backup: once a day from 03:15 (the owner's time), or at the first check after that when the
 // server was off at 03:15.
@@ -60,4 +63,46 @@ export async function backupStatus(db: Db): Promise<BackupStatus> {
   else if (!last?.lastSuccessAt || now().getTime() - last.lastSuccessAt.getTime() > STALE_AFTER_MS)
     state = "stale";
   return { state, dir: config.dir, keep: config.keep, last, files };
+}
+
+// A backup that failed: the owner is told once a day, in the notification centre and as the routes say.
+export async function alertBackupFailed(
+  db: Db,
+  message: string,
+  channels: Channels,
+  at: Date,
+): Promise<void> {
+  const day = todayIn(ADMIN_TIME_ZONE, at);
+  const text = `The nightly backup failed: ${message}`;
+  await alertOwner(
+    db,
+    channels,
+    {
+      kind: "problem",
+      key: `backup:${day}:failed`,
+      label: `Backup failed, ${day}`,
+      title: "The nightly backup failed",
+      body: message,
+      href: "/admin/system",
+      email: (to) => ({
+        to: [{ address: to }],
+        subject: "The nightly backup failed",
+        text: `${text}\n\nIt is tried again within the hour. See the System page: ${getEnv().SITE_URL}/admin/system\n`,
+      }),
+      discord: () => ({
+        embeds: [
+          {
+            title: "The nightly backup failed",
+            color: 0xf87171,
+            description: discordSafe(message, 1500),
+            fields: [],
+            footer: { text: "leffloard.xyz system" },
+            timestamp: at.toISOString(),
+          },
+        ],
+        allowed_mentions: { parse: [] },
+      }),
+    },
+    at,
+  );
 }

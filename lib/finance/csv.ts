@@ -32,5 +32,5 @@ export function toCsv(header: readonly string[], rows: readonly CsvCell[][], for
     return formatRate(value.rate, decimal);
   };
   const lines = [header.map((name) => text(name, separator)), ...rows.map((row) => row.map(cell))];
-  return `﻿${lines.map((line) => line.join(separator)).join("\r\n")}\r\n`;
+  return `\ufeff${lines.map((line) => line.join(separator)).join("\r\n")}\r\n`;
 }

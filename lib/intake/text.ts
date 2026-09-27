@@ -2,7 +2,7 @@
 // same input is accepted or refused with the same message. Shared by the forms and the server.
 
 // Python's str.strip() removes what str.isspace() calls whitespace; JavaScript's trim() differs on
-// \x1c-\x1f, \x85 and ﻿, so the set is spelled out.
+// \x1c-\x1f, \x85 and \ufeff, so the set is spelled out.
 const SPACE =
   "\\t\\n\\v\\f\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
 const EDGE_SPACE = new RegExp(`^[${SPACE}]+|[${SPACE}]+$`, "g");

@@ -25,6 +25,7 @@ import { setupTestDb } from "./db";
 import { setupTestEnv } from "./env";
 
 vi.mock("@/server/notify/kick", () => ({ sendQueuedSoon: vi.fn() }));
+vi.mock("@/server/analytics/kick", () => ({ goalSoon: vi.fn() }));
 
 const { db, url, name } = setupTestDb();
 setupTestEnv({

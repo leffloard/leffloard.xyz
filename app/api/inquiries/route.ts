@@ -7,6 +7,7 @@ import { getDb } from "@/server/db/client";
 import { getEnv } from "@/server/env";
 import { jsonResponse, readBodyText } from "@/server/http";
 import { triageSoon } from "@/server/ai/kick";
+import { goalSoon } from "@/server/analytics/kick";
 import { INTAKE_LIMIT, intakeLimitKey, submitInquiry } from "@/server/inquiries/intake";
 import { log } from "@/server/log";
 import { sendQueuedSoon } from "@/server/notify/kick";
@@ -79,6 +80,7 @@ export async function POST(request: Request): Promise<Response> {
       const inquiry = await submitInquiry(db, parsed.data, { source: "form", siteUrl: env.SITE_URL });
       sendQueuedSoon();
       triageSoon(db, inquiry);
+      if (inquiry.status !== "spam") goalSoon(request.headers, "inquiry");
       return { status: 201, body: { ok: true } };
     });
     const retryAfter = (result.body as { retryAfter?: number }).retryAfter;

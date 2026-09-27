@@ -56,6 +56,11 @@ const ITEMS: Item[] = [
     icon: "M4 4h12v12H4zM4 8h12M8 8v8",
   },
   {
+    href: "/admin/analytics",
+    label: "Analytics",
+    icon: "M3.5 13.5l4-4.5 3 3 6-6.5M3.5 16.5h13",
+  },
+  {
     href: "/admin/ai",
     label: "AI",
     icon: "M9 3.5l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5zM15 12.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z",
@@ -69,6 +74,11 @@ const ITEMS: Item[] = [
     href: "/admin/settings",
     label: "Settings",
     icon: "M4 6h7M14 6h2M11 4v4M4 14h2M9 14h7M6 12v4",
+  },
+  {
+    href: "/admin/system",
+    label: "System",
+    icon: "M3.5 4.5h13v8h-13zM7 16h6M10 12.5V16",
   },
 ];
 

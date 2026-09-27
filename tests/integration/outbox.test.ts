@@ -88,7 +88,13 @@ describe("the outbox", () => {
       label: "B",
     });
     const { senders, emails, posts } = recordingSenders();
-    expect(await drainOutbox(db(), { senders })).toEqual({ sent: 2, skipped: 0, retrying: 0, failed: 0 });
+    expect(await drainOutbox(db(), { senders })).toEqual({
+      sent: 2,
+      skipped: 0,
+      retrying: 0,
+      failed: 0,
+      held: 0,
+    });
     expect(emails.map((message) => message.subject)).toEqual(["First"]);
     expect(posts).toHaveLength(1);
     const items = await outbox(db()).find().toArray();
@@ -96,7 +102,13 @@ describe("the outbox", () => {
       ["sent", 1, clock.toISOString()],
       ["sent", 1, clock.toISOString()],
     ]);
-    expect(await drainOutbox(db(), { senders })).toEqual({ sent: 0, skipped: 0, retrying: 0, failed: 0 });
+    expect(await drainOutbox(db(), { senders })).toEqual({
+      sent: 0,
+      skipped: 0,
+      retrying: 0,
+      failed: 0,
+      held: 0,
+    });
   });
 
   it("skips a channel that is no longer configured", async () => {

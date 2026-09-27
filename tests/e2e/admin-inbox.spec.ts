@@ -60,7 +60,7 @@ test("new messages show in the inbox, with a count in the menu", async ({ page }
   await expect(rows.nth(0)).toBeFocused();
 
   await page.getByLabel("Search messages").fill("alan.inbox");
-  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText("Alan Turing");
 });

@@ -71,7 +71,9 @@ export default async function TasksPage({
       <PageHeader title="Tasks" description={`Today is ${formatWeekday(today, today)}.`} />
       <div className="mb-5">
         <QuickAddTask
-          key={view}
+          // A new one for "New task" from the palette, so the box takes the focus.
+          key={`${view}:${first(raw.new) ?? ""}`}
+          autoFocus={first(raw.new) === "1"}
           defaultWhen={DEFAULT_WHEN[view]}
           projects={projects.map((project) => ({
             id: project.id,

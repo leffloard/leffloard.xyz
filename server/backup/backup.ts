@@ -18,7 +18,8 @@ import {
 } from "@/server/backup/format";
 
 // Writes an encrypted copy of the database: every collection except short-lived security state, the
-// delivery log and the migration records (a restore runs the migrations, which also rebuild the indexes).
+// delivery log, the migration records (a restore runs the migrations, which also rebuild the indexes) and
+// the visitor statistics' daily salt (a copy would let a day's visitor ids be linked to addresses).
 
 export const EXCLUDED_COLLECTIONS: ReadonlySet<string> = new Set([
   "sessions",
@@ -31,6 +32,7 @@ export const EXCLUDED_COLLECTIONS: ReadonlySet<string> = new Set([
   "idempotency_keys",
   "locks",
   "csp_reports",
+  "analytics_salts",
   "outbox",
   "jobs",
   "schema_migrations",

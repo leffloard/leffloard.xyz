@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   backupNowAction,
   retryFailedAction,
@@ -27,8 +28,17 @@ export function NotificationsCard({
   return (
     <Card>
       <CardHeader
-        title="Notifications"
-        description="Set on the server (SMTP_*, NOTIFY_EMAIL_TO, DISCORD_WEBHOOK_URL). Changes need a restart."
+        title="Notification channels"
+        description={
+          <>
+            Set on the server (SMTP_*, NOTIFY_EMAIL_TO, DISCORD_WEBHOOK_URL); changes need a restart. Which
+            alerts use them, and quiet hours:{" "}
+            <Link href="/admin/notifications" className="text-accent underline underline-offset-2">
+              Notifications
+            </Link>
+            .
+          </>
+        }
       />
       <CardBody className="grid gap-3 text-[13px]">
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}

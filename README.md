@@ -47,8 +47,9 @@ and call requests. Open one to reply by email, change its status (and tell the v
 a call time, add labels or a private note, snooze it, mark it as spam or delete it. Keys in the list: `j`/`k`
 to move, `Enter` to open, `/` to search.
 
-Alerts about new messages go to Discord and to your email. Set them up in the server's environment (details
-in [`.env.example`](.env.example); the names are the same as in the v1 `.env`):
+Alerts about new messages (and bookings, payments and the rest) show under the bell, and go to Discord and
+to your email. Set the channels up in the server's environment (details in [`.env.example`](.env.example);
+the names are the same as in the v1 `.env`):
 
 1. **Email** (alerts and replies): for Gmail, create an App Password and set `SMTP_HOST=smtp.gmail.com`,
    `SMTP_USERNAME`, `SMTP_PASSWORD` and `NOTIFY_EMAIL_TO`.
@@ -57,7 +58,7 @@ in [`.env.example`](.env.example); the names are the same as in the v1 `.env`):
 
 Locally, `npm run dev:db` sets `EMAIL_DELIVERY=log`, so emails are printed in the terminal instead of sent.
 Settings also shows the delivery log (failed messages are retried and can be retried by hand) and the
-blocked senders.
+blocked senders; which alerts go where, and quiet hours, are on the Notifications page.
 
 **Moving the v1 requests** (once, at the cut-over): `npm run migrate-legacy` shows what would be copied,
 `npm run migrate-legacy -- --apply` copies it, and `npm run migrate-legacy -- --verify` checks the copy. The
@@ -175,6 +176,46 @@ Claude drafts; you decide. Nothing it writes is sent, saved or published without
 - **Privacy**: once someone ticks "Don't use AI tools on my message", none of their messages and nothing
   about them (a meeting brief) is sent to the AI. Drafts are kept 90 days, or less with the message they are
   about.
+
+### Analytics (`/admin/analytics`)
+
+Visits to the public site, counted without cookies and without keeping anyone's address: visitors and page
+views by day (or hour, or month), the pages read, where visits came from, campaigns, countries (behind
+Cloudflare), devices, goals (a message sent, a call booked, the CV downloaded), broken links, and how fast
+pages load in visitors' browsers. **Right now** shows the last 30 minutes and updates by itself; Today shows
+the day so far.
+
+- To see where a shared link brings people, add campaign tags to it:
+  `https://leffloard.xyz/?utm_source=twitter&utm_campaign=launch`.
+- Your own visits while signed in (or previewing drafts) aren't counted, and neither are browsers that ask
+  not to be tracked (Do Not Track, Global Privacy Control), bots, or the portal and quote, invoice and
+  meeting links.
+
+### Notifications (`/admin/notifications`)
+
+The bell at the top of the admin shows unread alerts: new messages, calls booked or changed, quote answers,
+payments, portal requests and problems (a failed backup, a recurring invoice or scheduled post that didn't
+go out). Click one to open what it is about.
+
+- **Where alerts go**: tick email and Discord per kind of alert.
+- **Quiet hours**: periods (the night, school hours) when email and Discord alerts are held; they go out when
+  the period ends. The bell shows them at once.
+- **Daily digest**: a morning email with today's calls, tasks due, messages waiting, money to collect and
+  yesterday's visits, at the time you choose. **Preview today's digest** and **Send it now** try it.
+
+### Search and shortcuts
+
+Press `Ctrl K` (`⌘ K` on a Mac) anywhere in the admin, or click **Search**, and type: a page ("invoices"), an
+action ("new quote"), or the name of a message, client, project, task, quote, invoice, meeting or post.
+Two-key shortcuts: `g` then `i` for the inbox, `g t` tasks, `g c` calendar, `g b` billing and so on; `c t`
+for a new task, `c q` a new quote. Press `?` for the full list.
+
+### System (`/admin/system`)
+
+The server's state in one place: the database (and how much of Atlas's 512 MB is used), the release, which
+services are set up, the background jobs, the backups (**Back up now**, and the restore drill), errors the
+server logged, and scripts browsers blocked (Content Security Policy reports). Clearing the error log or
+the reports asks you to confirm it's you.
 
 ### The client portal (`/portal`)
 

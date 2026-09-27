@@ -21,7 +21,8 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /(admin-(inbox|settings|work)|calendar|billing|portal|content|ai)\.spec\.ts/,
+      testIgnore:
+        /(admin-(inbox|settings|work)|calendar|billing|portal|content|ai|analytics|notifications|palette|system)\.spec\.ts/,
       use: chromium,
     },
     {
@@ -68,10 +69,20 @@ export default defineConfig({
       use: chromium,
     },
     {
-      // The AI assistant, against a mock of Anthropic's API: last, as it adds inbox messages.
+      // The AI assistant, against a mock of Anthropic's API: after the others, as it adds inbox messages.
       name: "ai",
-      testMatch: /ai\.spec\.ts/,
+      testMatch: /(^|\/)ai\.spec\.ts/,
       dependencies: ["content"],
+      use: chromium,
+    },
+    {
+      // Visitor statistics, notifications, the command palette and the system page: last, as they read
+      // what the other tests left.
+      name: "platform",
+      testMatch: /(analytics|notifications|palette|system)\.spec\.ts/,
+      dependencies: ["ai"],
+      // One at a time: the bell's count and the error log are shared by these specs.
+      workers: 1,
       use: chromium,
     },
   ],

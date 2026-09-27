@@ -1,5 +1,5 @@
 import { Writable } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "@/server/log";
 
 function capture(): { lines: () => Record<string, unknown>[]; stream: Writable } {
@@ -52,5 +52,27 @@ describe("createLogger", () => {
     log.info("hidden");
     log.warn("shown");
     expect(lines().map((line) => line.msg)).toEqual(["shown"]);
+  });
+});
+
+describe("the error log's sink", () => {
+  // Next.js bundles instrumentation.ts (which sets the sink) apart from the routes (which log), so each has
+  // its own copy of server/log.ts. Two copies here play that part.
+  it("gets error lines from every copy of the logger", async () => {
+    const first = await import("@/server/log");
+    vi.resetModules();
+    const second = await import("@/server/log");
+    expect(second).not.toBe(first);
+    const seen: Record<string, unknown>[] = [];
+    first.setErrorSink((line) => seen.push(line));
+    try {
+      const logger = second.createLogger(capture().stream, "info");
+      logger.warn("only a warning");
+      logger.error({ job: "digest" }, "background job failed");
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(seen).toMatchObject([{ msg: "background job failed", job: "digest", level: 50 }]);
+    } finally {
+      first.setErrorSink(null);
+    }
   });
 });

@@ -14,9 +14,11 @@ export type ProjectOption = { id: string; label: string };
 export function QuickAddTask({
   projects,
   defaultWhen = "none",
+  autoFocus = false,
 }: {
   projects: ProjectOption[];
   defaultWhen?: TaskWhen;
+  autoFocus?: boolean; // arriving from "New task" in the command palette
 }) {
   const { run, pending, message } = useActionRunner();
   const [title, setTitle] = useState("");
@@ -44,6 +46,7 @@ export function QuickAddTask({
         <input
           ref={input}
           id="quick-add-title"
+          autoFocus={autoFocus}
           className={cn(inputClasses, "h-9 min-w-48 flex-1")}
           placeholder="Add a task…  ( n )"
           maxLength={300}

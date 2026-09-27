@@ -3,14 +3,15 @@ import { E2E_BACKUP_DIR } from "./fixtures";
 import { signInOwner } from "./helpers";
 import { expect, test } from "./test";
 
-// Settings: backups and background jobs. Runs with the other admin modules (see playwright.config.ts).
+// Backups and background jobs, on the System page. Runs with the other admin modules (see
+// playwright.config.ts).
 
 test.beforeEach(async ({ context }) => {
   await signInOwner(context);
 });
 
 test("back up now writes an encrypted backup and lists it", async ({ page }) => {
-  await page.goto("/admin/settings");
+  await page.goto("/admin/system");
   const card = page.locator("section", { has: page.getByRole("heading", { name: "Backups" }) });
   await expect(card.getByText(/Encrypted, every night from 03:15/)).toBeVisible();
 

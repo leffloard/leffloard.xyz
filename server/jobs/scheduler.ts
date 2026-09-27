@@ -1,12 +1,16 @@
 import "server-only";
 import { Cron } from "croner";
+import { ADMIN_TIME_ZONE } from "@/lib/format";
+import { todayIn } from "@/lib/intake/time";
 import { purgeOrphanRuns } from "@/server/ai/ledger";
-import { runBackup } from "@/server/backup/service";
+import { rollupDays } from "@/server/analytics/stats";
+import { alertBackupFailed, runBackup } from "@/server/backup/service";
 import { reconcileCryptoPayments } from "@/server/billing/ipn";
 import { nowPaymentsConfig } from "@/server/billing/nowpayments";
 import { runRecurringJob } from "@/server/billing/recurring";
 import { runRemindersJob } from "@/server/billing/reminders";
 import { sendReminders } from "@/server/calendar/booking";
+import { now } from "@/server/clock";
 import { publishDue } from "@/server/content/editor";
 import { runGithubJob } from "@/server/content/github";
 import { getDb } from "@/server/db/client";
@@ -15,6 +19,7 @@ import { runRatesJob } from "@/server/finance/rates";
 import { runJob } from "@/server/jobs/runner";
 import { log } from "@/server/log";
 import { readChannels } from "@/server/notify/channels";
+import { runDigestJob } from "@/server/notify/digest";
 import { drainOutbox } from "@/server/notify/outbox";
 
 // Background work inside the web server process, started once from instrumentation.ts. Every job is safe
@@ -32,6 +37,35 @@ const JOBS: Job[] = [
     run: async () => {
       const removed = await purgeOrphanRuns(await getDb());
       if (removed) log.info({ removed }, "AI drafts about deleted items removed");
+    },
+  },
+  {
+    // Sums up yesterday's visits for the Analytics page, soon after midnight (server/analytics/stats.ts).
+    name: "analytics",
+    pattern: "5,35 * * * *",
+    run: async () => {
+      const db = await getDb();
+      const at = now();
+      const outcome = await runJob(
+        db,
+        "analytics",
+        async () => `${await rollupDays(db, at)} days summed up`,
+        { periodKey: todayIn(ADMIN_TIME_ZONE, at), lockMs: 10 * 60_000 },
+      );
+      if (outcome.ran) log.info({ ok: outcome.ok, result: outcome.message }, "visitor statistics");
+    },
+  },
+  {
+    // The owner's morning email, at the time set on the Notifications page (server/notify/digest.ts). Checked
+    // every minute, so any time of day works (the check is one read until the time comes).
+    name: "digest",
+    pattern: "* * * * *",
+    run: async () => {
+      const outcome = await runDigestJob(await getDb(), {
+        siteUrl: getEnv().SITE_URL,
+        channels: readChannels(),
+      });
+      if (outcome?.ran) log.info({ ok: outcome.ok, result: outcome.message }, "daily digest");
     },
   },
   {
@@ -73,8 +107,11 @@ const JOBS: Job[] = [
     name: "backup",
     pattern: "*/15 * * * *",
     run: async () => {
-      const outcome = await runBackup(await getDb(), { now: false });
-      if (outcome?.ran) log.info({ ok: outcome.ok, result: outcome.message }, "nightly backup");
+      const db = await getDb();
+      const outcome = await runBackup(db, { now: false });
+      if (!outcome?.ran) return;
+      log.info({ ok: outcome.ok, result: outcome.message }, "nightly backup");
+      if (!outcome.ok) await alertBackupFailed(db, outcome.message, readChannels(), now());
     },
   },
   {

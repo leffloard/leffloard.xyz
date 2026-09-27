@@ -2,6 +2,7 @@ import "server-only";
 import { formatProblems, readEnv } from "@/server/env";
 import { startScheduler } from "@/server/jobs/scheduler";
 import { log } from "@/server/log";
+import { startErrorLog } from "@/server/system/errors";
 
 // Runs once when the server starts. A broken configuration stops the start with a readable list
 // instead of failing later with a stack trace on the first request.
@@ -18,6 +19,7 @@ export function boot(): void {
     process.exit(1);
   }
   log.info({ db: report.env.DB_NAME, site: report.env.SITE_URL }, "leffloard.xyz is starting");
+  startErrorLog();
   if (report.env.BACKGROUND_JOBS === "on") startScheduler();
   else log.info("background jobs are off (BACKGROUND_JOBS=off)");
   // The code highlighter loads its grammars on first use, which takes seconds: done now, not during the

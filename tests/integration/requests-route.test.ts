@@ -13,6 +13,7 @@ import { setupTestEnv } from "./env";
 // The v1 request API, ported from tests/test_requests_api.py. See tests/legacy-parity.md.
 
 vi.mock("@/server/notify/kick", () => ({ sendQueuedSoon: vi.fn() }));
+vi.mock("@/server/analytics/kick", () => ({ goalSoon: vi.fn() }));
 vi.mock("@/server/ai/kick", () => ({ triageSoon: vi.fn() }));
 
 const { db, url, name } = setupTestDb();
@@ -201,7 +202,7 @@ describe("POST /api/requests", () => {
     const items = await outboxItems();
     expect(items.map((item) => [item.channel, item.dedupeKey, item.status])).toEqual([
       ["discord", `inquiry:${doc!._id.toHexString()}:discord`, "pending"],
-      ["email", `inquiry:${doc!._id.toHexString()}:owner-email`, "pending"],
+      ["email", `inquiry:${doc!._id.toHexString()}:email`, "pending"],
     ]);
     const [discord, email] = items;
     if (discord?.channel !== "discord" || email?.channel !== "email") throw new Error("unexpected channels");

@@ -16,8 +16,10 @@ import {
 } from "@/server/billing/emails";
 import { getBillingSettings } from "@/server/billing/settings";
 import type { InvoiceDoc, PaymentDoc, QuoteDoc, RecurringInvoiceDoc } from "@/server/billing/types";
+import { formatMoney, money } from "@/lib/money";
 import type { Channels } from "@/server/notify/channels";
 import { enqueue } from "@/server/notify/outbox";
+import { alertOwner } from "@/server/notify/owner";
 
 // Billing messages go through the outbox like every other: stored first under a dedupeKey, then sent.
 
@@ -66,26 +68,17 @@ export async function alertQuoteAnswer(
   answer: QuoteAnswer,
   notify: BillingNotify,
 ): Promise<void> {
-  const key = `quote:${quote._id.toHexString()}:owner-${answer}`;
-  const label = `Quote ${answer}: ${quote.number}`;
-  if (notify.channels.ownerEmail) {
-    await enqueue(db, {
-      channel: "email",
-      payload: quoteAnswerEmail(quote, answer, { to: notify.channels.ownerEmail, siteUrl: notify.siteUrl }),
-      dedupeKey: `${key}:email`,
-      label,
-      ref: { quoteId: quote._id },
-    });
-  }
-  if (notify.channels.discordWebhookUrl) {
-    await enqueue(db, {
-      channel: "discord",
-      payload: quoteAnswerDiscord(quote, answer, notify.siteUrl),
-      dedupeKey: `${key}:discord`,
-      label,
-      ref: { quoteId: quote._id },
-    });
-  }
+  await alertOwner(db, notify.channels, {
+    kind: "quote",
+    key: `quote:${quote._id.toHexString()}:owner-${answer}`,
+    label: `Quote ${answer}: ${quote.number}`,
+    title: `Quote ${answer}: ${quote.number}`,
+    body: `${quote.recipient.name}: ${quote.title}`,
+    href: `/admin/billing/quotes/${quote._id.toHexString()}`,
+    ref: { quoteId: quote._id },
+    email: (to) => quoteAnswerEmail(quote, answer, { to, siteUrl: notify.siteUrl }),
+    discord: () => quoteAnswerDiscord(quote, answer, notify.siteUrl),
+  });
 }
 
 // The client's receipt for a payment that arrived.
@@ -113,30 +106,21 @@ export async function alertPayment(
   event: PaymentEvent,
   notify: BillingNotify,
 ): Promise<void> {
-  const key = `payment:${payment._id.toHexString()}:owner-${event}`;
   const label =
     event === "received" ? `Payment received: ${invoice.number}` : `Payment to review: ${invoice.number}`;
-  if (notify.channels.ownerEmail) {
-    await enqueue(db, {
-      channel: "email",
-      payload: paymentAlertEmail(invoice, payment, event, {
-        to: notify.channels.ownerEmail,
-        siteUrl: notify.siteUrl,
-      }),
-      dedupeKey: `${key}:email`,
-      label,
-      ref: { invoiceId: invoice._id },
-    });
-  }
-  if (notify.channels.discordWebhookUrl) {
-    await enqueue(db, {
-      channel: "discord",
-      payload: paymentAlertDiscord(invoice, payment, event, notify.siteUrl),
-      dedupeKey: `${key}:discord`,
-      label,
-      ref: { invoiceId: invoice._id },
-    });
-  }
+  await alertOwner(db, notify.channels, {
+    kind: "payment",
+    key: `payment:${payment._id.toHexString()}:owner-${event}`,
+    label,
+    title: label,
+    body: `${formatMoney(money(payment.amountMinor, payment.currency))} from ${invoice.recipient.name}${
+      event === "review" && payment.reviewReason ? `: ${payment.reviewReason}` : ""
+    }`,
+    href: `/admin/billing/invoices/${invoice._id.toHexString()}`,
+    ref: { invoiceId: invoice._id },
+    email: (to) => paymentAlertEmail(invoice, payment, event, { to, siteUrl: notify.siteUrl }),
+    discord: () => paymentAlertDiscord(invoice, payment, event, notify.siteUrl),
+  });
 }
 
 // A recurring invoice that couldn't be issued: once per plan and date.
@@ -146,25 +130,14 @@ export async function alertRecurringProblem(
   problem: string,
   notify: BillingNotify,
 ): Promise<void> {
-  const key = `recurring:${plan._id.toHexString()}:${plan.nextOn ?? "none"}:problem`;
-  const label = `Recurring invoice not issued: ${plan.title}`;
-  if (notify.channels.ownerEmail) {
-    await enqueue(db, {
-      channel: "email",
-      payload: recurringProblemEmail(plan, problem, {
-        to: notify.channels.ownerEmail,
-        siteUrl: notify.siteUrl,
-      }),
-      dedupeKey: `${key}:email`,
-      label,
-    });
-  }
-  if (notify.channels.discordWebhookUrl) {
-    await enqueue(db, {
-      channel: "discord",
-      payload: recurringProblemDiscord(plan, problem, notify.siteUrl),
-      dedupeKey: `${key}:discord`,
-      label,
-    });
-  }
+  await alertOwner(db, notify.channels, {
+    kind: "problem",
+    key: `recurring:${plan._id.toHexString()}:${plan.nextOn ?? "none"}:problem`,
+    label: `Recurring invoice not issued: ${plan.title}`,
+    title: `Recurring invoice not issued: ${plan.title}`,
+    body: problem,
+    href: `/admin/billing/recurring/${plan._id.toHexString()}`,
+    email: (to) => recurringProblemEmail(plan, problem, { to, siteUrl: notify.siteUrl }),
+    discord: () => recurringProblemDiscord(plan, problem, notify.siteUrl),
+  });
 }

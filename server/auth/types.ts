@@ -103,7 +103,10 @@ export type AuditAction =
   | "finance.exported"
   | "content.published"
   | "content.deleted"
-  | "ai.settings.changed";
+  | "ai.settings.changed"
+  | "notifications.settings.changed"
+  | "system.errors.cleared"
+  | "system.csp.cleared";
 
 export type AuditDoc = {
   _id: ObjectId;
