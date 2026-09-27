@@ -1,0 +1,135 @@
+name: Nightly
+
+# What is too slow or too broad for every pull request: the end-to-end tests in every browser and on phones,
+# Lighthouse, the security suite with a full audit and a secret scan of the whole history, and CodeQL.
+# Scheduled workflows run on the default branch.
+
+on:
+  schedule:
+    # 02:17 UTC, 05:17 in Istanbul.
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # mongodb-memory-server keeps its MongoDB download here, so the cache below can restore it.
+  MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.data/mongodb-binaries
+
+jobs:
+  browsers:
+    name: End-to-end tests in every browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/cache@v6
+        with:
+          path: .data/mongodb-binaries
+          key: mongodb-${{ runner.os }}-${{ hashFiles('package.json') }}
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox webkit
+      # Every spec in Chromium, the admin's accessibility sweep included.
+      - run: npm run test:e2e
+      # The public pages and the contact form in Firefox, WebKit, and on a Pixel and an iPhone, with a
+      # database of their own, so they run whatever happened above.
+      - name: Other browsers and phones
+        if: success() || failure()
+        run: npx playwright test --project firefox --project webkit --project pixel --project iphone --no-deps --output test-results/other
+        env:
+          PW_ALL_BROWSERS: "1"
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report/other
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  lighthouse:
+    name: Lighthouse
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/cache@v6
+        with:
+          path: .data/mongodb-binaries
+          key: mongodb-${{ runner.os }}-${{ hashFiles('package.json') }}
+      - run: npm ci
+      - run: npm run build
+      # Eight public pages, three runs each, against the production build with a throwaway database
+      # (lighthouserc.json). With reduced motion, so a block still fading in below the fold isn't counted as
+      # low-contrast text; the hero's animation is off here anyway, as the runner has no graphics chip.
+      - name: Phone
+        run: npx --yes @lhci/cli@0.15.1 autorun --upload.outputDir=.lighthouseci/phone
+      - name: Desktop
+        if: success() || failure()
+        run: >-
+          npx --yes @lhci/cli@0.15.1 autorun --collect.settings.preset=desktop
+          --upload.outputDir=.lighthouseci/desktop
+      - uses: actions/upload-artifact@v7
+        if: success() || failure()
+        with:
+          name: lighthouse
+          path: .lighthouseci
+          retention-days: 14
+
+  security:
+    name: Security suite, audit and secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The secret scan reads every commit.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/cache@v6
+        with:
+          path: .data/mongodb-binaries
+          key: mongodb-${{ runner.os }}-${{ hashFiles('package.json') }}
+      - run: npm ci
+      - run: npm run test:security
+      # Every dependency, development tools included (pull requests check the production ones at "high").
+      - name: Audit all dependencies
+        run: npm audit --audit-level=moderate
+      - name: Scan the history for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v4

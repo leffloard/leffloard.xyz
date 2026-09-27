@@ -1,0 +1,159 @@
+import type { Metadata } from "next";
+import { LegalPage } from "@/components/site/legal";
+import { site } from "@/content/site";
+
+export const metadata: Metadata = {
+  title: "Privacy notice",
+  description:
+    "What personal data this site collects, why, where it is processed, and your rights under KVKK and the GDPR.",
+  alternates: { canonical: "/legal/privacy" },
+};
+
+export default function PrivacyPage() {
+  return (
+    <LegalPage title="Privacy notice" updated="26 September 2026">
+      <p>
+        This notice explains what personal data leffloard.xyz collects, why, and what you can ask me to do
+        with it. It is written to meet the Turkish Personal Data Protection Law (KVKK, No. 6698) and the EU
+        General Data Protection Regulation (GDPR).
+      </p>
+      <h2>Who is responsible</h2>
+      <p>
+        The data controller is {site.name}, an independent software developer in {site.location}. Contact:{" "}
+        <a href={`mailto:${site.email}`}>{site.email}</a>.
+      </p>
+      <h2>What I collect</h2>
+      <ul>
+        <li>
+          <strong>Messages you send me</strong> by email or through the site: your name, email address, and
+          whatever you write about your project.
+        </li>
+        <li>
+          <strong>Call bookings</strong>: your name, email address and time zone, the time you chose, and your
+          answers to the booking&apos;s questions.
+        </li>
+        <li>
+          <strong>Client records</strong> once we work together: your contact details, notes on our calls,
+          emails and meetings, the project&apos;s tasks, revision requests and the time spent on it, and
+          quotes, invoices and payments.
+        </li>
+        <li>
+          <strong>Quotes and invoices</strong>: the name, company, email and address they are made out to,
+          what they are for, and whether and when their link was opened.
+        </li>
+        <li>
+          <strong>Payments</strong>: for a bank transfer, the amount, the day it arrived and its reference
+          (which may show the sender&apos;s name); for cryptocurrency, NOWPayments&apos; payment number, the
+          coin and the amount paid. I never see card details, wallet keys or bank logins.
+        </li>
+        <li>
+          <strong>The client portal</strong>: the email address you sign in with and when you last signed in;
+          for each browser you are signed in on, its IP address and browser type; the updates I post on your
+          projects; and the revision and data requests you send from it.
+        </li>
+        <li>
+          <strong>Testimonials</strong>, only from clients who agree: their name, role and what they said
+          about the work, and my own note of how and when they agreed (never shown).
+        </li>
+        <li>
+          <strong>Technical data</strong> needed to run the site securely: IP address, browser type and the
+          time of a request, used for rate limits, abuse prevention and security logs.
+        </li>
+        <li>
+          <strong>Visit statistics</strong>: which pages were viewed, the site or campaign tag a visit came
+          from, the country (as Cloudflare sees it), whether the browser window is phone, tablet or desktop
+          sized, how fast the pages loaded, and whether a visit ended in a message, a booking or a CV
+          download. No IP address is stored. A visitor is counted with a one-way hash of that day&apos;s
+          random value, the IP address and the browser type; the day&apos;s value is deleted soon after the
+          day ends, after which the hash can&apos;t be linked to anyone. Nothing is counted when your browser
+          sends Do Not Track or Global Privacy Control.
+        </li>
+      </ul>
+      <p>
+        There are no advertising or tracking cookies, and the visit statistics use none. The only cookies are
+        the ones that keep you signed in to the admin or the client portal.
+      </p>
+      <h2>Why, and on what legal basis</h2>
+      <ul>
+        <li>To answer your inquiry and prepare a quote: steps before a contract, at your request.</li>
+        <li>
+          To hold a call you booked, and send you its invite, changes and a reminder: steps before a contract,
+          or the contract itself, at your request.
+        </li>
+        <li>
+          To deliver and invoice a project, confirm payments and remind you of an unpaid invoice: performance
+          of a contract, and legal obligations for accounting.
+        </li>
+        <li>
+          To let you follow your projects, invoices and calls in the client portal and send requests from it:
+          performance of a contract.
+        </li>
+        <li>To answer a request about your data: my legal obligations under KVKK and the GDPR.</li>
+        <li>
+          To show a testimonial: the person&apos;s consent, which they can withdraw at any time; I then take
+          it down.
+        </li>
+        <li>To keep the site secure: my legitimate interest in preventing abuse.</li>
+        <li>
+          To see which pages are useful and keep the site fast, with statistics that can&apos;t identify you:
+          my legitimate interest.
+        </li>
+      </ul>
+      <h2>Who processes it for me</h2>
+      <p>These services process data on my behalf. Some of them store or process data outside Turkey.</p>
+      <ul>
+        <li>MongoDB Atlas: the database that stores inquiries and client records.</li>
+        <li>
+          Google (Gmail, Google Calendar): email, and my own calendar, which shows the calls booked with me.
+        </li>
+        <li>
+          Discord: private notifications to me about new messages, bookings, and the requests clients send
+          from the portal, including what they wrote.
+        </li>
+        <li>
+          Jitsi Meet (meet.jit.si, run by 8x8): our video calls. The room&apos;s link is made on this site and
+          nothing from your booking is sent to Jitsi, but it carries the call itself.
+        </li>
+        <li>
+          Anthropic (Claude): only when I use my AI assistant to sort a message or draft a reply, a quote or a
+          brief before a call, and then only the text that draft needs. Under its commercial terms Anthropic
+          does not train its models on it. Never for a message whose sender ticked &ldquo;Don&apos;t use AI
+          tools on my message&rdquo;, and never about someone who ticked it on any message.
+        </li>
+        <li>Cloudflare: network, security and bot checks (Turnstile) for the site.</li>
+        <li>
+          NOWPayments: only if you choose to pay with cryptocurrency. It receives the invoice&apos;s number,
+          description and amount, and you pay on its page, under its own privacy policy.
+        </li>
+      </ul>
+      <h2>How long I keep it</h2>
+      <p>
+        Inquiries that do not become a project are deleted after 24 months without contact, and messages
+        marked as spam after 30 days. Call bookings are deleted 24 months after the call. Copies of the emails
+        the site sends are kept for 30 days to check they arrived. Client records, quotes, invoices and
+        payments are kept for as long as Turkish tax and commercial law requires (up to 10 years). The payment
+        provider&apos;s notifications about a payment are kept for about 13 months. Security logs are kept for
+        up to 12 months. A sign-in link for the client portal works once and expires after 20 minutes (an
+        invitation after 7 days); a portal sign-in ends after 7 days without use and is deleted at the latest
+        30 days after it started. Project updates and your data requests are kept with your client record.
+        Drafts written with the AI assistant are deleted after 90 days, or earlier with the message they are
+        about; its short summary of a message is kept, and deleted, with the message. Single page views are
+        kept for 60 days and page loading times for 90 days; the daily totals made from them say nothing about
+        any one visitor and are kept. A testimonial stays on the site until the person asks me to take it
+        down.
+      </p>
+      <h2>Your rights</h2>
+      <p>
+        You can ask whether I process your data, get a copy of it, have it corrected or deleted, object to its
+        processing, and ask where it was transferred. Under KVKK Article 11 and the GDPR you may also complain
+        to the Turkish Personal Data Protection Authority or your local EU data protection authority. To use
+        any of these rights, email <a href={`mailto:${site.email}`}>{site.email}</a>, or, if you are a client,
+        use the Account page of the client portal. I answer within 30 days.
+      </p>
+      <h2>Changes</h2>
+      <p>
+        When I add a new service that processes your data, it is listed here first, with a new date above.
+      </p>
+    </LegalPage>
+  );
+}

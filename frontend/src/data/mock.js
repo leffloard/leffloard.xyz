@@ -3,7 +3,7 @@ export const personalInfo = {
   title: "Full Stack Developer",
   tagline: "Building elegant solutions to complex problems",
   email: "erzincanligotik@gmail.com",
-  phone: "Email preferred",
+  phone: "+90 (541) 644-6234",
   location: "Denizli, TR",
   avatar: "https://i.imgur.com/nnjhGTt.png",
   bio: "Passionate software engineer with 5+ years of experience in building scalable web applications. I specialize in modern JavaScript frameworks and love creating intuitive user experiences. When I'm not coding, you'll find me exploring new technologies or contributing to open-source projects.",

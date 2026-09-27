@@ -1,0 +1,83 @@
+{
+  "name": "leffloard-xyz",
+  "version": "2.0.0-dev",
+  "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "dev:db": "tsx --conditions=react-server scripts/dev-db.ts",
+    "build": "next build",
+    "start": "tsx scripts/start.ts",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:security": "vitest run --project security",
+    "test:e2e": "playwright test",
+    "e2e:server": "node --conditions=react-server --import tsx scripts/e2e-server.ts",
+    "migrate": "tsx --conditions=react-server scripts/migrate.ts",
+    "migrate-legacy": "tsx --conditions=react-server scripts/migrate-legacy.ts",
+    "backup": "tsx --conditions=react-server scripts/backup.ts",
+    "content:lint": "tsx --conditions=react-server scripts/content-lint.ts",
+    "restore": "tsx --conditions=react-server scripts/restore.ts",
+    "admin": "tsx --conditions=react-server scripts/admin.ts",
+    "admin:create": "tsx --conditions=react-server scripts/admin.ts create"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "@node-rs/argon2": "^2.2.1",
+    "@react-pdf/renderer": "^4.9.0",
+    "@shikijs/rehype": "^4.4.3",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.3",
+    "croner": "^10.0.1",
+    "geist": "^1.7.2",
+    "jose": "^6.2.12",
+    "mongodb": "^7.6.0",
+    "next": "16.3.6",
+    "nodemailer": "^10.0.10",
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "rehype-sanitize": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "server-only": "^0.0.1",
+    "sharp": "^0.35.4",
+    "shiki": "^4.4.3",
+    "unified": "^11.0.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@next/env": "^16.3.6",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.20.4",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.6",
+    "mongodb-memory-server": "^11.3.0",
+    "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  },
+  "config": {
+    "mongodbMemoryServer": {
+      "version": "8.0.32"
+    }
+  }
+}

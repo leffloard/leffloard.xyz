@@ -1,5 +1,280 @@
 # leffloard.xyz - Personal Portfolio and Blog
 
+> **v2 is being built.** A new Next.js app at the repository root replaces `frontend/` and `backend/`,
+> milestone by milestone. Until the cut-over, everything below the [v2 section](#v2-in-progress) still
+> describes the live v1 site.
+
+## v2 (in progress)
+
+One Next.js 16 app (TypeScript, Tailwind 4, MongoDB) for the public site, the client portal and the admin
+system. Design, decisions and dependencies: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### Run it locally
+
+Requirements: Node.js 22.12 or newer (24 LTS recommended, see `.nvmrc`). Nothing else: the local database is
+downloaded on the first start (about 100 MB).
+
+1. In the repository root (not in `frontend/`): `npm install`
+2. `npm run dev:db` starts a local MongoDB and creates `.env.local` for it. Keep this terminal open.
+3. In a second terminal: `npm run dev`, then open http://localhost:3000.
+
+Development never touches the production Atlas database. The local data lives in `.data/dev-db`; delete that
+folder to start empty.
+
+### Editing the public site
+
+Everything the site shows is edited in the admin, under **Content** (see below). The files in `content/` are
+only what a new database starts with (`npm run dev:db` and the first deploy copy them in once); editing them
+changes nothing on a running site. Your photo: save it as `public/images/profile.jpg` (portrait, about
+1200 × 1500) and deploy; until then the About page shows your initials.
+
+### The admin (`/admin`)
+
+1. Create the owner account once, in a terminal on the machine that runs the site:
+   `npm run admin -- create` (asks for email, name and a password of at least 12 characters).
+2. Open `/admin/login` and sign in. The first sign-in sets up two-step sign-in: scan the QR code with an
+   authenticator app (Google Authenticator, 1Password, Aegis…), enter its code, and save the 10 recovery codes
+   it shows. They are not shown again.
+3. On the Security page, add a passkey (Windows Hello, Touch ID or your phone) as a second way in.
+
+Lost access? `npm run admin -- status` shows the account's setup; `reset-password`, `reset-2fa` and `unlock`
+are the recovery paths (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recovery)).
+
+### The inbox
+
+Messages from the contact form (`/contact`) land in **Inbox**: project briefs, questions, revision requests
+and call requests. Open one to reply by email, change its status (and tell the visitor if you like), confirm
+a call time, add labels or a private note, snooze it, mark it as spam or delete it. Keys in the list: `j`/`k`
+to move, `Enter` to open, `/` to search.
+
+Alerts about new messages (and bookings, payments and the rest) show under the bell, and go to Discord and
+to your email. Set the channels up in the server's environment (details in [`.env.example`](.env.example);
+the names are the same as in the v1 `.env`):
+
+1. **Email** (alerts and replies): for Gmail, create an App Password and set `SMTP_HOST=smtp.gmail.com`,
+   `SMTP_USERNAME`, `SMTP_PASSWORD` and `NOTIFY_EMAIL_TO`.
+2. **Discord** (alerts): a channel webhook in `DISCORD_WEBHOOK_URL`.
+3. Restart, open **Settings** and use **Send a test email** and **Send a test to Discord**.
+
+Locally, `npm run dev:db` sets `EMAIL_DELIVERY=log`, so emails are printed in the terminal instead of sent.
+Settings also shows the delivery log (failed messages are retried and can be retried by hand) and the
+blocked senders; which alerts go where, and quiet hours, are on the Notifications page.
+
+**Moving the v1 requests** (once, at the cut-over): `npm run migrate-legacy` shows what would be copied,
+`npm run migrate-legacy -- --apply` copies it, and `npm run migrate-legacy -- --verify` checks the copy. The
+v1 data is only read, never changed.
+
+### Clients, projects, tasks and time
+
+- **Clients**: open an inbox message and press **Make the sender a client**; later messages from that address
+  join the client's timeline by themselves. Log calls and meetings on the client's page. **Export data** and
+  **Delete client** are for privacy requests (both ask to confirm it's you).
+- **Projects**: **Start a project** from the message or the client. The board (`/admin/projects`) moves
+  projects between stages with the mouse or the keyboard (focus a card, then `Shift` + arrows). Each project
+  has tasks (its own board), revision rounds ("2 of 3 included rounds used"; extra rounds are marked billable),
+  time and a health view.
+- **Tasks** (`/admin/tasks`): Today, Overdue, Upcoming, Anytime and Someday lists. Keys: `n` new task, `j`/`k`
+  move, `x` done. Repeating tasks move to their next date when you finish them.
+- **Time**: the timer is in the sidebar (one runs at a time); the **Time** page is the week's timesheet, where
+  you can also add time by hand.
+
+### Calls and the calendar
+
+- **Booking page**: `/book` lists the calls anyone can book; each type has its own link, such as
+  `/book/intro-call`. Visitors pick a time in their own time zone and get a confirmation email with a
+  calendar invite and a link to reschedule or cancel. Video calls use Jitsi Meet (free, no account needed);
+  the room's link is in the invite. Emails need email delivery set up (see the inbox above).
+- **Your hours**: **Calendar → Hours, rules and the calendar feed** sets the weekly hours, special dates, the
+  gap after each call, the notice you need, how far ahead people can book and a daily limit. Blocks on the
+  Calendar page (school, an exam, a trip) keep time free.
+- **Booking types** (**Calendar → Booking types**): length, where the call happens, up to five questions,
+  who can book it (*Anyone*, listed on `/book`; *Clients*, listed in their portal; or *Only people you send
+  the link to*: copy the link from the type's card, **New link** retires the old one) and *I confirm each
+  booking first*. Requests wait in the Calendar until you confirm or decline them; the sidebar shows how
+  many.
+- **Your own meetings**: **New meeting** on the Calendar or a client's page. It is confirmed at once, and the
+  guest can get the invite by email.
+- **In your calendar app**: turn on the calendar feed and subscribe to its address in Google Calendar (Other
+  calendars → From URL), Apple Calendar or Outlook. It shows meetings, blocks and deadlines. Make a new
+  address if the old one leaks.
+
+### Quotes, invoices and getting paid
+
+- **First, Billing → Settings**: your business details (they print on every quote and invoice), payment
+  terms, and your bank accounts (IBANs are checked; changing them asks you to confirm it's you, and you get an
+  email about it). Until you issue official e-Arşiv invoices, documents are titled *Payment request*.
+- **Quotes**: **Write a quote** on an inbox message or **New quote** on a client. Pick lines from your
+  services or type them, add a discount or taxes, choose how it's paid (all upfront, 50/50 or 40/30/30), then
+  **Send**. The client gets a link where they read it, download the PDF and accept or decline it. Accepting
+  creates the project with its payment milestones and emails the first invoice.
+- **Invoices**: **New invoice** (or from a project). A draft can change; **Issue** gives it its number and
+  emails it, and from then on it's fixed: void it (only if nothing is paid) or make a credit note. The
+  client's link shows only the ways to pay you allowed on that invoice.
+- **Payments**: a bank transfer that arrived is recorded on the invoice with **Record a bank transfer** (the
+  client gets a receipt). Crypto payments (NOWPayments) confirm themselves: the invoice turns paid and you
+  get an email. Anything unusual (a part payment, the wrong amount) waits in **Billing → Payments** for you
+  to count what arrived or mark it failed.
+- **Recurring invoices** (care plans, hosting): **Billing → Recurring → New plan**. Write `{period}` where the
+  month should go, like *Care plan: {period}*; each invoice is issued on its date and emailed.
+- **Reminders**: clients get a friendly reminder a day, a week and two weeks after an invoice is due. Stop
+  them on the invoice's page if a client has promised to pay.
+- **Crypto set-up**: create a NOWPayments account (try their sandbox first), then set `NOWPAYMENTS_API_KEY`
+  and `NOWPAYMENTS_IPN_SECRET` (Settings → Payments → IPN in NOWPayments). Ask an accountant about crypto
+  income before going live.
+
+### Finance
+
+- **Finance → Overview**: income, expenses and profit month by month, who paid most, what you spend on, and
+  what clients owe you by how late it is, all in lira (or the base currency in Billing → Settings) at TCMB's
+  rate of each day. Rates are fetched twice a day; **Exchange rates** shows them.
+- **Expenses**: add what you pay for hosting, software, fees or hardware, with the receipt's number.
+- **Export**: a CSV for your accountant with every payment, refund and expense, in a form Excel opens on a
+  Turkish Windows.
+
+### Content (`/admin/content`)
+
+- **Work, Blog, Services, Testimonials**: open an item, change it and **Save the draft**. The site keeps
+  showing the published version until you press **Publish**. **Preview** opens the real page with your drafts
+  (for an hour, with a banner and an **Exit preview** button); only you see it.
+- **Case studies and posts** are Markdown: `## A heading` starts a numbered section of a case study, code
+  goes between ``` lines. Images: upload them under **Media**, then paste their Markdown where they belong.
+- **Profile**: the availability badge ("Taking new projects" or "Fully booked"), the pitch and the steps of
+  how a project runs. **CV** and **Pricing terms** are edited the same way.
+- **Publish later**: pick a day and a time (Istanbul) and it goes live by itself; if something stops it, you
+  get an email.
+- **Earlier versions**: every publication keeps the copy it replaced; **Bring back** puts one into the draft.
+- **Leak check**: every publication is checked for keys, webhooks, Discord ids, IP addresses, other people's
+  emails, phone numbers and the words you list under **Leak check** (client names, private domains). If it
+  finds something, nothing is published and you see what it found.
+- **Testimonials** are published only once you tick that the person agreed, and note how.
+- **GitHub**: the public repositories of your account, read every six hours (or **Sync now**). Tick the ones
+  the work page should list; case studies show their repository's stars either way. Optional:
+  `GITHUB_TOKEN` (a fine-grained token with no permissions) raises GitHub's hourly limit.
+
+### The AI assistant (`/admin/ai`)
+
+Claude drafts; you decide. Nothing it writes is sent, saved or published without your click.
+
+- **Setting up**: create an API key at console.anthropic.com (set a spend limit there too), put it in
+  `ANTHROPIC_API_KEY` on the server and restart. On the **AI** page tick **The AI assistant is on**, check the
+  monthly budget (US dollars, $15 to start) and **Save**; **Check the key** confirms the key and the model.
+  Unticking the box stops every AI request at once.
+- **Inbox**: **Triage with AI** on a message says what it is, how urgent, how well it fits and what to ask;
+  **Add these labels** adds its labels. **Draft a reply** writes a reply as you watch (tell it what to say in
+  the notes); **Put it in the message** copies it into the reply, which you edit and send.
+- **Quotes**: on a quote made from a message, **Suggest lines with AI** picks packages from your services;
+  their prices come from your price list, never from the AI. Lines it can't match have no price: set it.
+- **Meetings**: **Prepare a brief** on a meeting's page sums up the guest, their messages and history, and
+  what to ask. Meetings with a brief show *brief ready* on Today.
+- **Today**: **Write this week's review** looks at the last and next seven days.
+- **Content**: **AI writing help** beside the editor rewrites a field, or drafts a case study from a facts
+  sheet you fill in. The text goes into the form unsaved; the leak check still runs when you publish.
+- **Costs**: the AI page shows this month's spending against the budget, how much came from the cache, each
+  request with its cost and draft, and past months, which **Add to expenses** puts into the finance expenses
+  (check the amount against Anthropic's invoice). A request that could take the month past the budget is not
+  made.
+- **Privacy**: once someone ticks "Don't use AI tools on my message", none of their messages and nothing
+  about them (a meeting brief) is sent to the AI. Drafts are kept 90 days, or less with the message they are
+  about.
+
+### Analytics (`/admin/analytics`)
+
+Visits to the public site, counted without cookies and without keeping anyone's address: visitors and page
+views by day (or hour, or month), the pages read, where visits came from, campaigns, countries (behind
+Cloudflare), devices, goals (a message sent, a call booked, the CV downloaded), broken links, and how fast
+pages load in visitors' browsers. **Right now** shows the last 30 minutes and updates by itself; Today shows
+the day so far.
+
+- To see where a shared link brings people, add campaign tags to it:
+  `https://leffloard.xyz/?utm_source=twitter&utm_campaign=launch`.
+- Your own visits while signed in (or previewing drafts) aren't counted, and neither are browsers that ask
+  not to be tracked (Do Not Track, Global Privacy Control), bots, or the portal and quote, invoice and
+  meeting links.
+
+### Notifications (`/admin/notifications`)
+
+The bell at the top of the admin shows unread alerts: new messages, calls booked or changed, quote answers,
+payments, portal requests and problems (a failed backup, a recurring invoice or scheduled post that didn't
+go out). Click one to open what it is about.
+
+- **Where alerts go**: tick email and Discord per kind of alert.
+- **Quiet hours**: periods (the night, school hours) when email and Discord alerts are held; they go out when
+  the period ends. The bell shows them at once.
+- **Daily digest**: a morning email with today's calls, tasks due, messages waiting, money to collect and
+  yesterday's visits, at the time you choose. **Preview today's digest** and **Send it now** try it.
+
+### Search and shortcuts
+
+Press `Ctrl K` (`⌘ K` on a Mac) anywhere in the admin, or click **Search**, and type: a page ("invoices"), an
+action ("new quote"), or the name of a message, client, project, task, quote, invoice, meeting or post.
+Two-key shortcuts: `g` then `i` for the inbox, `g t` tasks, `g c` calendar, `g b` billing and so on; `c t`
+for a new task, `c q` a new quote. Press `?` for the full list.
+
+### System (`/admin/system`)
+
+The server's state in one place: the database (and how much of Atlas's 512 MB is used), the release, which
+services are set up, the background jobs, the backups (**Back up now**, and the restore drill), errors the
+server logged, and scripts browsers blocked (Content Security Policy reports). Clearing the error log or
+the reports asks you to confirm it's you.
+
+### The client portal (`/portal`)
+
+- **Inviting a client**: **Invite to the portal** on the client's page emails them a sign-in link valid for a
+  week (clients who accept a quote are invited by themselves). Later they type their address at
+  `/portal/login` and get a new link, valid for 20 minutes. There are no client passwords.
+- **What they see**: their projects with the steps, your updates and the links you share, their revision
+  rounds, invoices and quotes (paid from the invoice's own page), their calls and the booking types for
+  clients, and their details.
+- **On a project's page**: **Post the update** ("the staging site is up") shows it in their portal, and
+  emails it if you leave the box ticked. Tick **Shared** next to a link to show it to them.
+- **Revision requests** from the portal arrive like the ones you add, marked *from the portal*, with an email
+  and a Discord message. A round past the included ones is only sent after the client agrees to its price.
+- **Data requests**: a client can ask for a copy of their data or its deletion. They show on the client's
+  page (and you get an email). For a copy, send them the file from **Export data**, then mark the request
+  done with a note. For a deletion, **Delete client** is the answer: the request goes with the rest of their
+  data, and the audit log keeps the record. Answer within 30 days.
+- **Turn off** on the client's page closes their portal and signs them out everywhere; **Sign out
+  everywhere** there signs them out but leaves the portal on.
+
+### Useful commands
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev:db` | Local MongoDB (replica set) on port 27027, applies migrations |
+| `npm run dev` | Development server with hot reload |
+| `npm run migrate` | Applies pending migrations to the database in `MONGO_URL` (`npm run migrate -- --status` only lists them) |
+| `npm run migrate-legacy` | Copies the v1 requests into the inbox (dry run; `-- --apply` to copy, `-- --verify` to check) |
+| `npm run backup` | Writes an encrypted backup to `BACKUP_DIR` now (the server also makes one every night) |
+| `npm run restore -- <file> --check` | Restore drill: restores a backup into a temporary database, compares, deletes it |
+| `npm run admin -- <command>` | Owner account tools: `create`, `status`, `reset-password`, `reset-2fa`, `unlock` |
+| `npm run build`, then `npm start` | Production build, started the way the server runs it |
+| `npm run lint`, `npm run typecheck`, `npm run format` | Code checks and formatting |
+| `npm run test:unit`, `npm run test:integration` | Tests (the integration tests start their own MongoDB) |
+| `npm run build`, then `npm run test:e2e` | Browser tests (first time: `npx playwright install chromium`) |
+| `npm run test:security` | The security suite: every action, route and page without a session, hostile request bodies, headers, cookies, Markdown and uploads |
+| `PW_ALL_BROWSERS=1 npm run test:e2e` | The public pages also in Firefox, WebKit and on phones (first: `npx playwright install firefox webkit`) |
+| `npm run e2e:server` | The production build on port 3100 with a throwaway database, as the browser tests use it |
+| `k6 run load/<script>.js` | Load tests against `npm run e2e:server` or a staging copy ([load/README.md](load/README.md)) |
+| `npx @lhci/cli@0.15.1 autorun` | Lighthouse on eight public pages, as a phone (after `npm run build`) |
+
+### Going live
+
+The server setup, the Cloudflare Tunnel, the switch from v1, deploys, rollbacks and restoring a backup are in
+[docs/DEPLOY.md](docs/DEPLOY.md). In short: `install-service.ps1` once, then `deploy.ps1` for every update.
+What to do when something goes wrong, how to change each secret, removing v1 after the switch and the
+monthly routine are in [docs/RUNBOOK.md](docs/RUNBOOK.md).
+
+### Configuration
+
+Every variable is documented in [`.env.example`](.env.example). The app checks them when it starts and prints
+a plain-English list of anything wrong (for example a doubled `MONGO_URL=`), instead of a stack trace.
+Health check: `GET /api/health` (public) and `GET /api/health?deep=1` with the `x-health-token` header set to
+`HEALTH_TOKEN` (configuration, database and migrations).
+
+---
+
+# v1 (current live site)
+
 A personal portfolio and blog web application built with a modern web stack. The project features a React (Vite) frontend, a FastAPI backend, and a MongoDB database.
 
 ---

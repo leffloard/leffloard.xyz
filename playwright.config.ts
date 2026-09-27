@@ -1,0 +1,122 @@
+import { defineConfig, devices } from "@playwright/test";
+import { E2E_BASE_URL } from "./tests/e2e/fixtures";
+
+// For machines with a preinstalled Chromium instead of "npx playwright install chromium".
+const launchOptions = process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {};
+const chromium = { ...devices["Desktop Chrome"], launchOptions };
+
+// The public pages and the contact form in the other engines and on phones: nightly, or locally with
+// PW_ALL_BROWSERS=1 (after "npx playwright install firefox webkit"). In one run with the rest they come last,
+// as their visits and messages would change what the admin tests count; the nightly runs them on their own
+// ("--no-deps", with a database of their own). Each sends from its own address, so the contact form's
+// per-address limit doesn't carry over between them.
+const PUBLIC_SPECS = /(^|[\\/])(public|smoke|contact)\.spec\.ts$/;
+const otherBrowsers = [
+  { name: "firefox", use: devices["Desktop Firefox"] },
+  { name: "webkit", use: devices["Desktop Safari"] },
+  { name: "pixel", use: { ...devices["Pixel 7"], launchOptions } },
+  { name: "iphone", use: devices["iPhone 15"] },
+].map(({ name, use }, index) => ({
+  name,
+  testMatch: PUBLIC_SPECS,
+  dependencies: ["accessibility"],
+  use: { ...use, extraHTTPHeaders: { "x-forwarded-for": `198.51.100.${10 + index}` } },
+}));
+
+// Runs against the production build: "npm run build", then "npm run test:e2e".
+export default defineConfig({
+  testDir: "tests/e2e",
+  fullyParallel: true,
+  forbidOnly: Boolean(process.env.CI),
+  retries: 0,
+  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : [["list"]],
+  use: {
+    baseURL: E2E_BASE_URL,
+    trace: "retain-on-failure",
+  },
+  projects: [
+    {
+      name: "chromium",
+      testIgnore:
+        /(admin-(inbox|settings|work)|calendar|billing|portal|content|ai|analytics|notifications|palette|system|accessibility)\.spec\.ts/,
+      use: chromium,
+    },
+    {
+      // Admin modules sign in with a session written to the database. They run after the sign-in tests,
+      // which sign out every other session on purpose.
+      name: "admin-modules",
+      testMatch: /admin-(inbox|settings)\.spec\.ts/,
+      dependencies: ["chromium"],
+      use: chromium,
+    },
+    {
+      // Clients, projects, tasks and time: after the inbox tests, which count every inbox message.
+      name: "admin-work",
+      testMatch: /admin-work\.spec\.ts/,
+      dependencies: ["admin-modules"],
+      use: chromium,
+    },
+    {
+      // Booking and the calendar: last, as they reset the calendar's hours and booking types.
+      name: "calendar",
+      testMatch: /calendar\.spec\.ts/,
+      dependencies: ["admin-work"],
+      use: chromium,
+    },
+    {
+      // Quotes, invoices and payments: after the calendar, one step after another.
+      name: "billing",
+      testMatch: /billing\.spec\.ts/,
+      dependencies: ["calendar"],
+      use: chromium,
+    },
+    {
+      // The client portal: after billing, whose projects it checks it can't see.
+      name: "portal",
+      testMatch: /portal\.spec\.ts/,
+      dependencies: ["billing"],
+      use: chromium,
+    },
+    {
+      // The content editor: after the others, as it changes what the public pages show.
+      name: "content",
+      testMatch: /content\.spec\.ts/,
+      dependencies: ["portal"],
+      use: chromium,
+    },
+    {
+      // The AI assistant, against a mock of Anthropic's API: after the others, as it adds inbox messages.
+      name: "ai",
+      testMatch: /(^|\/)ai\.spec\.ts/,
+      dependencies: ["content"],
+      use: chromium,
+    },
+    {
+      // Visitor statistics, notifications, the command palette and the system page: last, as they read
+      // what the other tests left.
+      name: "platform",
+      testMatch: /(analytics|notifications|palette|system)\.spec\.ts/,
+      dependencies: ["ai"],
+      // One at a time: the bell's count and the error log are shared by these specs.
+      workers: 1,
+      use: chromium,
+    },
+    {
+      // Every admin page through axe: at the very end, when the other tests have filled the lists.
+      name: "accessibility",
+      testMatch: /accessibility\.spec\.ts/,
+      dependencies: ["platform"],
+      use: chromium,
+    },
+    ...(process.env.PW_ALL_BROWSERS === "1" ? otherBrowsers : []),
+  ],
+  webServer: {
+    command: "node --conditions=react-server --import tsx scripts/e2e-server.ts",
+    url: `${E2E_BASE_URL}/api/health`,
+    timeout: 180_000,
+    reuseExistingServer: false,
+    gracefulShutdown: { signal: "SIGTERM", timeout: 15_000 },
+    stdout: "pipe",
+    stderr: "pipe",
+  },
+});
