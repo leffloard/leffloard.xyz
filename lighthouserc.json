@@ -1,0 +1,38 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "npm run e2e:server",
+      "startServerReadyPattern": "Ready in",
+      "startServerReadyTimeout": 300000,
+      "url": [
+        "http://localhost:3100/",
+        "http://localhost:3100/work",
+        "http://localhost:3100/work/miniengine",
+        "http://localhost:3100/services",
+        "http://localhost:3100/pricing",
+        "http://localhost:3100/about",
+        "http://localhost:3100/blog/how-this-site-signs-me-in",
+        "http://localhost:3100/contact"
+      ],
+      "numberOfRuns": 3,
+      "settings": {
+        "chromeFlags": "--force-prefers-reduced-motion"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.9, "aggregationMethod": "median-run" }],
+        "categories:accessibility": ["error", { "minScore": 1, "aggregationMethod": "median-run" }],
+        "categories:best-practices": ["error", { "minScore": 1, "aggregationMethod": "median-run" }],
+        "categories:seo": ["error", { "minScore": 1, "aggregationMethod": "median-run" }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.02, "aggregationMethod": "median-run" }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 150, "aggregationMethod": "median-run" }],
+        "largest-contentful-paint": ["warn", { "maxNumericValue": 1800, "aggregationMethod": "median-run" }]
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci/reports"
+    }
+  }
+}

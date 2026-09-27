@@ -58,7 +58,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
       <Section id="extras" index="02" label="Add-ons and delivery">
         <div className="grid gap-10 md:grid-cols-2">
           <div>
-            <h2 className="text-lg font-semibold">Add-ons</h2>
+            <h3 className="text-lg font-semibold">Add-ons</h3>
             <ul className="mt-4 grid gap-2">
               {service.addOns.map((addOn) => (
                 <li
@@ -72,7 +72,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
             </ul>
           </div>
           <div>
-            <h2 className="text-lg font-semibold">Every project includes</h2>
+            <h3 className="text-lg font-semibold">Every project includes</h3>
             <ul className="prose-list mt-4">
               {service.deliverables.map((line) => (
                 <li key={line}>{line}</li>

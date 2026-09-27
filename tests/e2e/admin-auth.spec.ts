@@ -1,5 +1,5 @@
 import { E2E_BASE_URL, OWNER } from "./fixtures";
-import { freshTotp, signInWithRecoveryCode, submitPassword, withDb } from "./helpers";
+import { axeViolations, freshTotp, signInWithRecoveryCode, submitPassword, withDb } from "./helpers";
 import { expect, test, watchPage } from "./test";
 
 // One owner account, one story: set up two-step sign-in, then use every way in and out. Serial, because
@@ -13,6 +13,7 @@ test("the admin asks for a sign-in and runs under a nonce-based CSP", async ({ p
   const response = await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/login$/);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  expect(await axeViolations(page)).toEqual([]);
 
   const headers = response!.headers();
   expect(headers["content-security-policy"]).toMatch(
@@ -31,6 +32,7 @@ test("the first sign-in sets up the authenticator app and shows recovery codes o
   await expect(page).toHaveURL(/\/admin\/setup$/);
   secret = (await page.getByTestId("totp-secret").textContent())!.replace(/\s/g, "");
   expect(secret).toMatch(/^[A-Z2-7]{32}$/);
+  expect(await axeViolations(page)).toEqual([]);
 
   await page.getByLabel("Code from the app").fill("000000");
   await page.getByRole("button", { name: "Turn on two-step sign-in" }).click();
@@ -41,6 +43,7 @@ test("the first sign-in sets up the authenticator app and shows recovery codes o
   await expect(page.getByText("Two-step sign-in is on.")).toBeVisible();
   await expect(page.getByTestId("recovery-codes").locator("li")).toHaveCount(10);
   recoveryCodes = await page.getByTestId("recovery-codes").locator("li").allTextContents();
+  expect(await axeViolations(page)).toEqual([]);
 
   await page.getByRole("link", { name: "Continue to the admin" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/, Test$/);
@@ -52,6 +55,7 @@ test("password plus authenticator code; wrong codes count down", async ({ page }
   await page.getByLabel("Code").fill("000000");
   await page.getByRole("button", { name: "Verify" }).click();
   await expect(page.getByText("That code didn't work. 4 tries left.")).toBeVisible();
+  expect(await axeViolations(page)).toEqual([]);
 
   await page.getByLabel("Code").fill(await freshTotp(secret));
   await page.getByRole("button", { name: "Verify" }).click();

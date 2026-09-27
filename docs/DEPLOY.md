@@ -125,7 +125,8 @@ drive or a cloud folder): the files are encrypted.
 ```
 
 It checks the file, restores it into a temporary database, compares every collection with the backup's own
-count, and deletes the temporary database. It should end with "Every collection matches".
+count, and deletes the temporary database. It should report "Every collection matches the backup's own
+count".
 
 **A real restore:** restore into a new database first, check it, then switch `DB_NAME` in the settings and
 restart. That leaves the damaged database in place for comparison:
@@ -154,11 +155,11 @@ hostname, so only you can see it.
 
 ## Troubleshooting
 
-| Symptom                                | Look at                                                                           |
-| -------------------------------------- | --------------------------------------------------------------------------------- |
-| Cloudflare shows 502                   | `Get-Service leffloard, cloudflared`; then `service.log`.                         |
-| The service stops right after starting | The end of `service.log`: a settings problem is listed there in plain English.    |
-| The admin keeps asking for Access      | `CF_ACCESS_AUD` must be the tag of the application that covers `/admin`.          |
-| Forms say the bot check failed         | `TURNSTILE_*` keys, and the widget's hostname list.                               |
-| Backups fail with "access denied"      | Run `install-service.ps1` again; it grants the service write access to `backups`. |
-| A deploy stopped at the trial          | `C:\leffloard\shared\logs\trial-<time>.log`; the live site was not changed.       |
+| Symptom                                | Look at                                                                                                                                  |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Cloudflare shows 502                   | `Get-Service leffloard, cloudflared`; then `service.log`.                                                                                |
+| The service stops right after starting | The end of `service.log`: a settings problem is listed there in plain English.                                                           |
+| The admin keeps asking for Access      | `CF_ACCESS_AUD` must be the tag of the application that covers `/admin`.                                                                 |
+| Forms say the bot check failed         | `TURNSTILE_*` keys, and the widget's hostname list.                                                                                      |
+| Backups fail with "access denied"      | Run `install-service.ps1` again (it grants the service write access to `backups`), then `Start-Service leffloard`: it stops the service. |
+| A deploy stopped at the trial          | `C:\leffloard\shared\logs\trial-<time>.log`; the live site was not changed.                                                              |

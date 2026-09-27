@@ -29,6 +29,18 @@ export default defineConfig({
           hookTimeout: 180_000,
         },
       },
+      {
+        // Attacks on the whole surface: every action and route without a session, hostile input on every
+        // public endpoint, headers, cookies, Markdown and uploads (tests/security).
+        extends: true,
+        test: {
+          name: "security",
+          include: ["tests/security/**/*.test.ts"],
+          globalSetup: ["tests/integration/global-setup.ts"],
+          testTimeout: 30_000,
+          hookTimeout: 180_000,
+        },
+      },
     ],
   },
 });

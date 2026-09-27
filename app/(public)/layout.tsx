@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import { GeistMono, GeistSans } from "@/components/fonts";
 import { Analytics } from "@/components/site/analytics";
 import { SiteFooter } from "@/components/site/site-footer";
 import { PreviewBanner } from "@/components/site/preview-banner";

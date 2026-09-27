@@ -251,11 +251,18 @@ the reports asks you to confirm it's you.
 | `npm run lint`, `npm run typecheck`, `npm run format` | Code checks and formatting |
 | `npm run test:unit`, `npm run test:integration` | Tests (the integration tests start their own MongoDB) |
 | `npm run build`, then `npm run test:e2e` | Browser tests (first time: `npx playwright install chromium`) |
+| `npm run test:security` | The security suite: every action, route and page without a session, hostile request bodies, headers, cookies, Markdown and uploads |
+| `PW_ALL_BROWSERS=1 npm run test:e2e` | The public pages also in Firefox, WebKit and on phones (first: `npx playwright install firefox webkit`) |
+| `npm run e2e:server` | The production build on port 3100 with a throwaway database, as the browser tests use it |
+| `k6 run load/<script>.js` | Load tests against `npm run e2e:server` or a staging copy ([load/README.md](load/README.md)) |
+| `npx @lhci/cli@0.15.1 autorun` | Lighthouse on eight public pages, as a phone (after `npm run build`) |
 
 ### Going live
 
 The server setup, the Cloudflare Tunnel, the switch from v1, deploys, rollbacks and restoring a backup are in
 [docs/DEPLOY.md](docs/DEPLOY.md). In short: `install-service.ps1` once, then `deploy.ps1` for every update.
+What to do when something goes wrong, how to change each secret, removing v1 after the switch and the
+monthly routine are in [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 ### Configuration
 

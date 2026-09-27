@@ -1,11 +1,27 @@
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_BASE_URL } from "./tests/e2e/fixtures";
 
-const chromium = {
-  ...devices["Desktop Chrome"],
-  // For machines with a preinstalled Chromium instead of "npx playwright install chromium".
-  launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
-};
+// For machines with a preinstalled Chromium instead of "npx playwright install chromium".
+const launchOptions = process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {};
+const chromium = { ...devices["Desktop Chrome"], launchOptions };
+
+// The public pages and the contact form in the other engines and on phones: nightly, or locally with
+// PW_ALL_BROWSERS=1 (after "npx playwright install firefox webkit"). In one run with the rest they come last,
+// as their visits and messages would change what the admin tests count; the nightly runs them on their own
+// ("--no-deps", with a database of their own). Each sends from its own address, so the contact form's
+// per-address limit doesn't carry over between them.
+const PUBLIC_SPECS = /(^|[\\/])(public|smoke|contact)\.spec\.ts$/;
+const otherBrowsers = [
+  { name: "firefox", use: devices["Desktop Firefox"] },
+  { name: "webkit", use: devices["Desktop Safari"] },
+  { name: "pixel", use: { ...devices["Pixel 7"], launchOptions } },
+  { name: "iphone", use: devices["iPhone 15"] },
+].map(({ name, use }, index) => ({
+  name,
+  testMatch: PUBLIC_SPECS,
+  dependencies: ["accessibility"],
+  use: { ...use, extraHTTPHeaders: { "x-forwarded-for": `198.51.100.${10 + index}` } },
+}));
 
 // Runs against the production build: "npm run build", then "npm run test:e2e".
 export default defineConfig({
@@ -22,7 +38,7 @@ export default defineConfig({
     {
       name: "chromium",
       testIgnore:
-        /(admin-(inbox|settings|work)|calendar|billing|portal|content|ai|analytics|notifications|palette|system)\.spec\.ts/,
+        /(admin-(inbox|settings|work)|calendar|billing|portal|content|ai|analytics|notifications|palette|system|accessibility)\.spec\.ts/,
       use: chromium,
     },
     {
@@ -85,6 +101,14 @@ export default defineConfig({
       workers: 1,
       use: chromium,
     },
+    {
+      // Every admin page through axe: at the very end, when the other tests have filled the lists.
+      name: "accessibility",
+      testMatch: /accessibility\.spec\.ts/,
+      dependencies: ["platform"],
+      use: chromium,
+    },
+    ...(process.env.PW_ALL_BROWSERS === "1" ? otherBrowsers : []),
   ],
   webServer: {
     command: "node --conditions=react-server --import tsx scripts/e2e-server.ts",

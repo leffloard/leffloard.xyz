@@ -9,7 +9,7 @@ import { describeMoment, todayIn } from "@/lib/intake/time";
 import { formatMoney, money } from "@/lib/money";
 import { PROJECT_STAGE_LABELS } from "@/lib/work/options";
 import { longDate } from "@/server/billing/view";
-import { manageTokenOf } from "@/server/calendar/meetings";
+import { readableManageToken } from "@/server/calendar/meetings";
 import { now } from "@/server/clock";
 import { getDb } from "@/server/db/client";
 import { requirePortalClient } from "@/server/portal/dal";
@@ -33,6 +33,7 @@ export default async function PortalOverviewPage() {
     (invoice) => invoice.kind === "invoice" && invoice.status === "issued" && amountLeft(invoice) > 0,
   );
   const next = calls.upcoming[0];
+  const nextManageToken = next ? readableManageToken(next) : null;
 
   return (
     <>
@@ -121,12 +122,14 @@ export default async function PortalOverviewPage() {
                   Join the call
                 </a>
               ) : null}
-              <a
-                href={`/meeting/${manageTokenOf(next)}`}
-                className="text-muted underline underline-offset-4 hover:text-ink"
-              >
-                Move or cancel it
-              </a>
+              {nextManageToken ? (
+                <a
+                  href={`/meeting/${nextManageToken}`}
+                  className="text-muted underline underline-offset-4 hover:text-ink"
+                >
+                  Move or cancel it
+                </a>
+              ) : null}
             </div>
           </div>
         ) : (

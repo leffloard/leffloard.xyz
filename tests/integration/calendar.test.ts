@@ -1,5 +1,5 @@
 import type { ObjectId } from "mongodb";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_AVAILABILITY, type Availability } from "@/lib/booking/availability";
 import { createBlock, deleteBlock } from "@/server/calendar/blocks";
 import {
@@ -21,7 +21,9 @@ import {
   endMeeting,
   findMeetingByToken,
   getMeeting,
+  manageTokenOf,
   openSlots,
+  readableManageToken,
   rescheduleMeeting,
   SlotTakenError,
   type NewMeeting,
@@ -37,6 +39,8 @@ import {
 import { clientTimeline, createClient, deleteClient, exportClient } from "@/server/clients/store";
 import { resetClock } from "@/server/clock";
 import { runMigrations } from "@/server/db/migrate";
+import { clearEnvCache } from "@/server/env";
+import { TEST_ENCRYPTION_KEYS } from "../helpers/env";
 import { setupTestDb } from "./db";
 import { setupTestEnv } from "./env";
 
@@ -185,6 +189,20 @@ describe("meetings", () => {
     expect((await findMeetingByToken(db(), token))?._id.equals(booked._id)).toBe(true);
     expect(await findMeetingByToken(db(), "not-a-token")).toBeNull();
     expect(booked.manageTokenHash).not.toContain(token);
+  });
+
+  it("shows no manage link on pages once the key that sealed it is retired, instead of failing", async () => {
+    const { meeting: booked, token } = await createMeeting(db(), meeting(), RULES, { enforceCap: true }, NOW);
+    expect(readableManageToken(booked)).toBe(token);
+    vi.stubEnv("DATA_ENCRYPTION_KEYS", `2:${Buffer.alloc(32, 9).toString("base64")}`);
+    clearEnvCache();
+    try {
+      expect(() => manageTokenOf(booked)).toThrow();
+      expect(readableManageToken(booked)).toBeNull();
+    } finally {
+      vi.stubEnv("DATA_ENCRYPTION_KEYS", TEST_ENCRYPTION_KEYS);
+      clearEnvCache();
+    }
   });
 
   it("books a time once, however many people ask for it at the same moment", async () => {

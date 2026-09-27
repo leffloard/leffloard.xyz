@@ -16,7 +16,7 @@ export const ALERT_KIND_INFO: Record<AlertKind, { label: string; description: st
   portal: { label: "Portal requests", description: "Revision and data requests from clients." },
   problem: {
     label: "Problems",
-    description: "A recurring invoice or scheduled post that failed, a failed backup.",
+    description: "A recurring invoice or scheduled post that failed, a failed backup, a locked sign-in.",
   },
 };
 

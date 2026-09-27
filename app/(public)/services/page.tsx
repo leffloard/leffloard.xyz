@@ -33,7 +33,7 @@ export default async function ServicesPage() {
           >
             <div className="reveal grid gap-8 md:grid-cols-12">
               <div className="md:col-span-7">
-                <h2 className="text-3xl font-semibold tracking-tight text-balance">{service.short}</h2>
+                <h3 className="text-3xl font-semibold tracking-tight text-balance">{service.short}</h3>
                 <p className="mt-4 text-lg text-pretty text-muted">{service.intro}</p>
                 <Link
                   href={`/services/${service.slug}`}

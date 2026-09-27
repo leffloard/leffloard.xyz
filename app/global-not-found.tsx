@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import { GeistMono, GeistSans } from "@/components/fonts";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { Analytics } from "@/components/site/analytics";

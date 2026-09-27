@@ -106,6 +106,7 @@ export function ContentAssistant({
               notes={null}
               onUse={(draft) => onReplace(field, draft)}
               useLabel="Replace the field"
+              draftLabel={`AI rewrite of "${label}"`}
               disabledReason={disabledReason}
             />
           ) : (
@@ -135,6 +136,7 @@ export function ContentAssistant({
               notes={null}
               onUse={(draft) => onReplace("body", draft)}
               useLabel="Use as the case study"
+              draftLabel="AI case study draft"
               disabledReason={disabledReason}
             />
           </section>

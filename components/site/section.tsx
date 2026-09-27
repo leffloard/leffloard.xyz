@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/components/ui/cn";
 
 // A page section on the drawing grid: an index label ("01 / Work"), a title, and crosshair marks where its
-// top border meets the frame.
+// top border meets the frame. Without a title the label is the section's heading, so what the section holds
+// (cards with their own headings, a form) sits one level below it.
 export function Section({
   id,
   index,
@@ -23,10 +24,11 @@ export function Section({
   className?: string;
 }) {
   const headingId = id ? `${id}-title` : undefined;
+  const Label = title ? "p" : "h2";
   return (
     <section
       id={id}
-      aria-labelledby={title ? headingId : undefined}
+      aria-labelledby={title || label ? headingId : undefined}
       className={cn("relative border-t border-line", className)}
     >
       <span aria-hidden className="crosshair top-0 left-0" />
@@ -35,10 +37,17 @@ export function Section({
         {label || title ? (
           <header className="reveal mb-10 grid gap-4 sm:mb-14 md:grid-cols-12">
             {label ? (
-              <p className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase md:col-span-3 md:pt-2">
-                {index ? <span className="text-accent">{index} / </span> : null}
+              <Label
+                id={title ? undefined : headingId}
+                className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase md:col-span-3 md:pt-2"
+              >
+                {index ? (
+                  <span aria-hidden className="text-accent">
+                    {index} /{" "}
+                  </span>
+                ) : null}
                 {label}
-              </p>
+              </Label>
             ) : null}
             <div className={cn("md:col-span-9", !label && "md:col-start-4")}>
               {title ? (

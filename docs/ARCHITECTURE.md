@@ -197,19 +197,19 @@ limit, so a hanging database cannot hang the health check.
 There is one account, the owner, created on the server with `npm run admin -- create`. Everything below is
 enforced on the server and covered by unit, integration and browser tests.
 
-| Threat                          | Defence                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Password guessing               | argon2id (19 MiB, 2 passes); unknown emails are checked against a dummy hash, so both answers take as long. 20 attempts per 15 minutes per address. Progressive lock per email address: 15 minutes from the 5th failure, 1 hour from the 10th, 24 hours from the 20th; failures are forgotten after a quiet day. Unknown addresses lock the same way, so locks reveal nothing. |
-| Stolen password                 | Every password sign-in needs a second factor: an authenticator app (TOTP, one-step drift, each code accepted once) or a single-use recovery code (10, stored as keyed hashes). The first sign-in sets up the authenticator before any session exists.                                                                                                                          |
-| Locking the owner out           | Passkeys (WebAuthn, user verification required) count as both factors and ignore the password lock. The server console can reset the password or the second factors (`npm run admin`).                                                                                                                                                                                         |
-| Stolen session cookie           | 256-bit random tokens; only their SHA-256 is stored. `__Host-` cookies (Secure, HttpOnly, SameSite=Lax, whole site). Sessions end after 30 idle minutes and 12 hours at most, can be signed out from the Security page, and all others end when the password or authenticator changes.                                                                                         |
-| Actions from a hijacked session | Changing the password, authenticator, recovery codes or passkeys needs "confirm it's you" (password + code, or a passkey), valid for 10 minutes.                                                                                                                                                                                                                               |
-| Secrets in a database copy      | Authenticator secrets are encrypted with AES-256-GCM (`DATA_ENCRYPTION_KEYS`, numbered for rotation) and bound to their record; recovery codes are HMAC'd with a key derived from it.                                                                                                                                                                                          |
-| Bots                            | Cloudflare Turnstile on the sign-in form (fails closed when Cloudflare cannot confirm).                                                                                                                                                                                                                                                                                        |
-| Reaching /admin at all          | Optional Cloudflare Access in front of `/admin`; when configured, the app also verifies the Access JWT on every admin request.                                                                                                                                                                                                                                                 |
-| CSRF                            | Next.js checks the Origin of server actions; route handlers that change data use `isSameOriginRequest()`. Sign-in cookies are SameSite=Strict.                                                                                                                                                                                                                                 |
-| NoSQL injection                 | Inputs are parsed with strict zod schemas; keys starting with `$`, containing `.` or named `__proto__` are refused first.                                                                                                                                                                                                                                                      |
-| Audit                           | Sign-ins, failures, locks and every security change are written to `audit_log` and shown on the Security page.                                                                                                                                                                                                                                                                 |
+| Threat                          | Defence                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Password guessing               | argon2id (19 MiB, 2 passes); unknown emails are checked against a dummy hash, so both answers take as long. 20 attempts per 15 minutes per address. Progressive lock per email address: 15 minutes from the 5th failure, 1 hour from the 10th, 24 hours from the 20th; failures are forgotten after a quiet day. Unknown addresses lock the same way, so locks reveal nothing.                         |
+| Stolen password                 | Every password sign-in needs a second factor: an authenticator app (TOTP, one-step drift, each code accepted once) or a single-use recovery code (10, stored as keyed hashes). The first sign-in sets up the authenticator before any session exists.                                                                                                                                                  |
+| Locking the owner out           | Passkeys (WebAuthn, user verification required) count as both factors and ignore the password lock. The server console can reset the password or the second factors (`npm run admin`).                                                                                                                                                                                                                 |
+| Stolen session cookie           | 256-bit random tokens; only their SHA-256 is stored. `__Host-` cookies (Secure, HttpOnly, SameSite=Lax, whole site). Sessions end after 30 idle minutes and 12 hours at most, can be signed out from the Security page, and all others end when the password or authenticator changes.                                                                                                                 |
+| Actions from a hijacked session | Changing the password, authenticator, recovery codes or passkeys needs "confirm it's you" (password + code, or a passkey), valid for 10 minutes.                                                                                                                                                                                                                                                       |
+| Secrets in a database copy      | Authenticator secrets are encrypted with AES-256-GCM (`DATA_ENCRYPTION_KEYS`, numbered for rotation) and bound to their record; recovery codes are HMAC'd with a key derived from it.                                                                                                                                                                                                                  |
+| Bots                            | Cloudflare Turnstile on the sign-in form (fails closed when Cloudflare cannot confirm).                                                                                                                                                                                                                                                                                                                |
+| Reaching /admin at all          | Optional Cloudflare Access in front of `/admin`; when configured, the app also verifies the Access JWT on every admin request.                                                                                                                                                                                                                                                                         |
+| CSRF                            | Next.js checks the Origin of server actions; route handlers that change data use `isSameOriginRequest()`. Sign-in cookies are SameSite=Strict.                                                                                                                                                                                                                                                         |
+| NoSQL injection                 | Inputs are parsed with strict zod schemas; keys starting with `$`, containing `.` or named `__proto__` are refused first.                                                                                                                                                                                                                                                                              |
+| Audit                           | Sign-ins, failures, locks and every security change are written to `audit_log` and shown on the Security page. A lock is also an alert (`server/auth/alerts.ts`): every lock that follows the right password with wrong codes (the password is known), each step of the owner's own lock, and once a day for addresses that aren't an account; none names the address or where the attempts came from. |
 
 ### Content Security Policy and headers
 
@@ -264,10 +264,21 @@ lines at the edges of the content column, "+" marks where sections meet the fram
 ("01 / Work"), one cyan accent and large Geist Sans headings. Colour tokens are CSS variables in
 `app/globals.css`; every text/background pair meets WCAG AA in both themes (the lowest is 4.9:1).
 
+Geist Sans and Mono are self-hosted (`components/fonts`): the `geist` package's variable fonts cut down to
+Latin with Turkish, punctuation, currency signs and arrows (Mono also keeps box drawing, for code blocks), and
+the layout features the site uses: 65 KB for both instead of 138 KB. Other characters fall back to the
+system's font of the same kind. The PDFs and share images use the package's full TTF files.
+
 Motion is limited to opacity and transform: headings rise on load, sections reveal with CSS scroll-driven
-animations, cards light up around the pointer. With reduced motion nothing moves. The home page's contour
-field is a WebGL2 shader (`components/site/signal-field.tsx`) that starts when the browser is idle, stays
-off with reduced motion or Save-Data, pauses off-screen, and is not needed for the page to be complete.
+animations, cards light up around the pointer. With reduced motion nothing moves. A reveal is done within
+the bottom 120px of the screen (or as soon as a smaller block is wholly on it), so text further up is never
+faded, and there are none when the reader asks for more contrast. The home page's contour field is a WebGL2
+shader (`components/site/signal-field.tsx`) that starts when the browser is idle, stays off with reduced
+motion, Save-Data or a software renderer (no usable graphics chip: drawing it on the processor would make
+the page stutter), pauses off-screen, and is not needed for the page to be complete.
+
+A section's label ("01 / Work") is its heading when it has no title, so headings never skip a level; the
+end-to-end tests run axe's best practices (heading order, landmarks told apart) along with WCAG 2.2 AA.
 
 ### Search engines and sharing
 
@@ -710,7 +721,8 @@ once.
 
 ## Operations
 
-The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
+Setting up and deploying are in [DEPLOY.md](DEPLOY.md), incidents, changing secrets and the routine in
+[RUNBOOK.md](RUNBOOK.md); this is how the pieces fit.
 
 - **Service.** NSSM runs `node C:\leffloard\current\start-production.cjs` as the virtual account
   `NT SERVICE\leffloard`. The launcher reads the settings file (readable only by that account and
@@ -748,19 +760,35 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
 
 ## Testing
 
-| Suite       | Command                             | Needs                                                   |
-| ----------- | ----------------------------------- | ------------------------------------------------------- |
-| Unit        | `npm run test:unit`                 | nothing                                                 |
-| Integration | `npm run test:integration`          | downloads MongoDB on first run                          |
-| End-to-end  | `npm run build && npm run test:e2e` | Playwright Chromium (`npx playwright install chromium`) |
+| Suite       | Command                                                | Needs                                                           |
+| ----------- | ------------------------------------------------------ | --------------------------------------------------------------- |
+| Unit        | `npm run test:unit`                                    | nothing                                                         |
+| Integration | `npm run test:integration`                             | downloads MongoDB on first run                                  |
+| Security    | `npm run test:security`                                | downloads MongoDB on first run                                  |
+| End-to-end  | `npm run build && npm run test:e2e`                    | Playwright Chromium (`npx playwright install chromium`)         |
+| Load        | `npm run e2e:server`, then `k6 run load/<script>.js`   | [k6](https://grafana.com/docs/k6/latest/); see `load/README.md` |
+| Lighthouse  | `npx @lhci/cli@0.15.1 autorun` (after `npm run build`) | Chrome; `lighthouserc.json`                                     |
 
 - Integration tests share one throwaway replica set per run (`tests/integration/global-setup.ts`); each test
   file gets its own database, emptied before every test.
 - End-to-end tests start `scripts/e2e-server.ts`: a throwaway database with migrations applied and the
   standalone build started exactly as production starts it. Any console error or failed request on a page
   fails the test.
-- Every public page is checked with axe (WCAG 2.2 AA) in both themes, and for horizontal overflow at 360px;
-  the admin's pages are checked with axe as the tests go through them.
+- Every public page is checked with axe (WCAG 2.2 AA and axe's best practices) in both themes, and for
+  horizontal overflow at 360px; the admin's pages are checked as the tests go through them, and at the end
+  `accessibility.spec.ts` opens every admin page, and the pages of one record of each kind the tests made.
+- `budgets.spec.ts` holds each main public page to what it downloads: 150 KB of JavaScript (gzipped; 170 KB
+  on the two pages with a form), 30 KB of CSS and 80 KB of fonts.
+- With `PW_ALL_BROWSERS=1` the public pages and the contact form also run in Firefox, WebKit, and as a Pixel 7
+  and an iPhone 15, each from its own address and with its own contact details: after everything else in
+  one run, or on their own with `--no-deps` and a database of their own (as the nightly workflow does).
+- The security suite (`tests/security`) sweeps the whole surface rather than one feature: every server action
+  (found by its "use server" directive anywhere in the code; inline ones are refused) refuses without a
+  session and with a forged one, every admin page and route checks the session, every route that takes data
+  from the public checks its origin, and a corpus of hostile bodies goes to every post, put, patch and delete
+  handler, against a database with an owner, a portal client, a message, a meeting and an invoice (no
+  server error, no stored document changed, no prototype pollution); then headers, cookies, Markdown and
+  uploads.
 - Admin tests that share data run in order: the sign-in tests, then the inbox and settings, then the work
   modules, then booking and the calendar, then billing, then the portal, then the content editor, which
   changes what public pages show, then the AI assistant, then the visitor statistics, notifications,
@@ -789,6 +817,14 @@ The runbook is [DEPLOY.md](DEPLOY.md); this is how the pieces fit.
 - **windows** (Windows): types, unit and integration tests and the production build, because production runs
   on a Windows server.
 - **legacy** (Ubuntu): the v1 backend's pytest suite, until v1 is removed.
+
+`.github/workflows/nightly.yml` runs every night (and by hand) what is too slow or broad for every pull
+request: the end-to-end tests, then the public pages in the other browsers and on phones, Lighthouse on
+eight public pages as a phone and as a desktop (median of three runs; performance at least 90,
+accessibility, best practices and SEO 100, layout shift at most 0.02; blocking time over 150 ms and a
+largest paint over 1.8 s are warnings), the security suite, `npm audit` of every dependency, a secret scan
+of the whole history (gitleaks) and CodeQL. Scheduled workflows run on the default branch, so the nightly
+starts once this branch is merged.
 
 Dependabot proposes npm and GitHub Actions updates weekly; `next`, `react` and their types are grouped.
 
@@ -934,3 +970,14 @@ Every direct dependency and why it is here.
 41. **The error log is fed by the logger, not by each caller.** Every `log.error` already names what failed;
     copying those lines (after redaction, sampled, best effort) shows problems on the System page without a
     second error-reporting path to keep in step.
+42. **Subset fonts in the repository instead of the package's full files** (M12). The pages used 138 KB of
+    fonts for Cyrillic, Greek, Vietnamese and stylistic alternates they never show; the cut-down copies are
+    65 KB and render the site's text identically once loaded (compared pixel for pixel). Other characters
+    fall back to the system's font of the same kind, and the commands that make them are next to them.
+43. **Decoration gives way first** (M12). The hero's shader runs only where a graphics chip draws it, and
+    reveals finish close to the bottom edge: a slower machine or a reader who needs contrast gets the page
+    without them rather than a stuttering or faded one.
+44. **Checks by cost: every pull request, every night, or by hand** (M12). Pull requests get what decides a
+    merge in minutes (Chromium end to end, the security suite, budgets); the nightly adds the other
+    browsers, Lighthouse, the full audit, the secret scan and CodeQL; load tests need a staging copy and are
+    run by hand (`load/README.md`).

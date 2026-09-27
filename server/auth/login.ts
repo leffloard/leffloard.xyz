@@ -4,6 +4,7 @@ import type { Db, Filter } from "mongodb";
 import QRCode from "qrcode";
 import { base32Encode } from "@/lib/base32";
 import { otpauthUri, verifyTotp } from "@/lib/totp";
+import { alertSignInLocked } from "@/server/auth/alerts";
 import { audit } from "@/server/auth/audit";
 import { createSession, grantSudo, revokeOtherSessions } from "@/server/auth/sessions";
 import {
@@ -88,6 +89,11 @@ export async function passwordStep(
         userAgent: client.userAgent,
         details: { failures: failure.failures, until: failure.lockedUntil.toISOString() },
       });
+      await alertSignInLocked(
+        db,
+        { failures: failure.failures, until: failure.lockedUntil, userId: actorId, step: "password" },
+        now(),
+      );
       return { status: "locked", until: failure.lockedUntil };
     }
     return { status: "invalid" };
@@ -191,6 +197,11 @@ export async function secondFactorStep(
         userAgent: client.userAgent,
         details: { failures: failure.failures, until: failure.lockedUntil.toISOString() },
       });
+      await alertSignInLocked(
+        db,
+        { failures: failure.failures, until: failure.lockedUntil, userId: user._id, step: "code" },
+        now(),
+      );
       return { status: "locked", until: failure.lockedUntil };
     }
     return attemptsLeft > 0 ? { status: "invalid", attemptsLeft } : { status: "expired" };

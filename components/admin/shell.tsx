@@ -57,7 +57,10 @@ export function AdminShell({
 }) {
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[232px_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface/40 lg:flex">
+      <aside
+        aria-label="Sidebar"
+        className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface/40 lg:flex"
+      >
         <div className="flex h-14 items-center gap-2.5 border-b border-line px-4">
           <Logo className="size-6" />
           <span className="text-sm font-semibold tracking-tight">leffloard</span>

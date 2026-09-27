@@ -43,7 +43,7 @@ for (const path of PAGES) {
     // axe would report as low contrast; with reduced motion everything is shown at once.
     await page.emulateMedia({ reducedMotion: "reduce" });
     const axe = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"])
       .analyze();
     expect(
       axe.violations.map(
@@ -63,7 +63,7 @@ test("light theme also passes axe", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
   for (const path of ["/", "/pricing", "/blog/let-the-model-read-never-count"]) {
     await page.goto(path);
-    const axe = await new AxeBuilder({ page }).withTags(["wcag2aa"]).analyze();
+    const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "best-practice"]).analyze();
     expect(axe.violations.map((violation) => violation.id)).toEqual([]);
   }
 });
@@ -71,7 +71,14 @@ test("light theme also passes axe", async ({ page }) => {
 test("the home page's shader stays off with reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await page.waitForTimeout(1500);
+  await expect(page.locator("canvas")).toHaveAttribute("data-off", "reduced-motion");
+  await expect(page.locator("canvas")).not.toHaveAttribute("data-ready", "true");
+});
+
+test("the home page's shader stays off without a graphics chip", async ({ page }) => {
+  // Headless browsers draw WebGL on the processor, if at all: the field would make the page stutter.
+  await page.goto("/");
+  await expect(page.locator("canvas")).toHaveAttribute("data-off", /^(software|no-webgl)$/);
   await expect(page.locator("canvas")).not.toHaveAttribute("data-ready", "true");
 });
 

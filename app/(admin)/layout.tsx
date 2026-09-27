@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import { GeistMono, GeistSans } from "@/components/fonts";
 import "../globals.css";
 
 // Everything under /admin is rendered per request (sessions, CSP nonces) and kept out of search engines.

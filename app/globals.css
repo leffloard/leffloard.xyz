@@ -183,11 +183,16 @@ body {
     animation: pulse-dot 2.4s ease-out infinite;
   }
 
+  /* Done within the bottom 120px of the screen, or as soon as a smaller block is wholly on screen: faded text
+     has less contrast, so text further up is never faded (and none is for readers who ask for more contrast). */
   @supports (animation-timeline: view()) {
-    .reveal {
-      animation: reveal linear both;
-      animation-timeline: view();
-      animation-range: entry 0% cover 22%;
+    @media not (prefers-contrast: more) {
+      .reveal {
+        animation: reveal linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 120px;
+        animation-range: entry 0% entry min(100%, 120px);
+      }
     }
   }
 }

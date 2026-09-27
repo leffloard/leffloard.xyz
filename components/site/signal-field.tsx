@@ -3,8 +3,25 @@
 import { useEffect, useRef } from "react";
 
 // The hero's moving contour map. WebGL2, one full-screen triangle, a few hundred bytes of shader.
-// Skipped entirely for reduced motion, Save-Data, or browsers without WebGL2; the page is complete
-// without it. Pauses when off-screen or in a background tab, and caps itself at ~30 frames per second.
+// Skipped entirely for reduced motion, Save-Data, browsers without WebGL2, and where WebGL would be drawn
+// by the processor instead of a graphics chip (no usable GPU: a virtual machine, a remote desktop, a blocked
+// driver), which would make the whole page stutter; the page is complete without it. Pauses when off-screen
+// or in a background tab, and caps itself at ~30 frames per second.
+
+// Renderers that draw on the processor: Chrome's SwiftShader, Mesa's llvmpipe and softpipe, Windows' Basic
+// Render Driver.
+const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|software|basic render/i;
+
+function softwareRendered(gl: WebGL2RenderingContext): boolean {
+  // Firefox names the renderer here; Chrome and Safari say "WebKit WebGL" and name it through the debug
+  // extension instead (asking Firefox for that extension logs a deprecation warning).
+  let renderer = String(gl.getParameter(gl.RENDERER));
+  if (/webkit webgl/i.test(renderer)) {
+    const debug = gl.getExtension("WEBGL_debug_renderer_info");
+    if (debug) renderer = String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL));
+  }
+  return SOFTWARE_RENDERER.test(renderer);
+}
 
 const VERTEX = `#version 300 es
 in vec2 position;
@@ -92,22 +109,37 @@ export function SignalField({ className }: { className?: string }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-    if (reducedMotion || saveData) return;
+    // Why the field stays off, on the canvas for the tests (the page is the same either way).
+    const off = (reason: "reduced-motion" | "save-data" | "no-webgl" | "software" | "shader") => {
+      canvas.dataset.off = reason;
+    };
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return off("reduced-motion");
+    if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) {
+      return off("save-data");
+    }
 
     let stop = () => {};
     const start = () => {
-      const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, premultipliedAlpha: true });
-      if (!gl) return;
+      const gl = canvas.getContext("webgl2", {
+        alpha: true,
+        antialias: false,
+        premultipliedAlpha: true,
+        failIfMajorPerformanceCaveat: true,
+        powerPreference: "low-power",
+      });
+      if (!gl) return off("no-webgl");
+      if (softwareRendered(gl)) {
+        gl.getExtension("WEBGL_lose_context")?.loseContext();
+        return off("software");
+      }
       const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX);
       const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
       const program = gl.createProgram();
-      if (!vertex || !fragment || !program) return;
+      if (!vertex || !fragment || !program) return off("shader");
       gl.attachShader(program, vertex);
       gl.attachShader(program, fragment);
       gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return off("shader");
       gl.useProgram(program);
 
       const buffer = gl.createBuffer();

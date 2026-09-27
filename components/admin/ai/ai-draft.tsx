@@ -20,6 +20,8 @@ type Props = {
   useLabel?: string;
   saved?: SavedDraft | null; // the last draft, kept on the server (meeting briefs, weekly reviews)
   disabledReason?: string | null;
+  // Names the draft for screen readers; pages with two drafts give each its own.
+  draftLabel?: string;
 };
 
 export function AiDraft({
@@ -30,6 +32,7 @@ export function AiDraft({
   useLabel = "Use this draft",
   saved = null,
   disabledReason = null,
+  draftLabel = "AI draft",
 }: Props) {
   const ai = useAiStream();
   const [guidance, setGuidance] = useState("");
@@ -96,7 +99,7 @@ export function AiDraft({
         <div
           className="max-h-96 overflow-y-auto rounded-md border border-line bg-surface-2/60 px-3 py-2.5 text-[13px] leading-6 break-words whitespace-pre-wrap"
           aria-busy={ai.busy}
-          aria-label="AI draft"
+          aria-label={draftLabel}
           role="region"
           tabIndex={0}
         >

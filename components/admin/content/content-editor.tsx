@@ -179,7 +179,7 @@ export function ContentEditor(props: Props) {
         </div>
       </form>
 
-      <aside className="grid content-start gap-4">
+      <aside aria-label="Publishing" className="grid content-start gap-4">
         <Card>
           <CardHeader title="Publishing" />
           <CardBody className="grid gap-3 text-[13px]">

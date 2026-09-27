@@ -143,7 +143,11 @@ async function checkoutOf(invoice: InvoiceDoc): Promise<PaymentDoc> {
 }
 
 // A callback signed the way NOWPayments' plugins do it: the body's JSON with its keys sorted.
-function callback(body: Record<string, unknown>, secret = SECRET): Promise<Response> {
+function callback(
+  body: Record<string, unknown>,
+  secret = SECRET,
+  address = "198.51.100.20",
+): Promise<Response> {
   const sorted = Object.fromEntries(
     Object.keys(body)
       .sort()
@@ -153,7 +157,7 @@ function callback(body: Record<string, unknown>, secret = SECRET): Promise<Respo
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-forwarded-for": "198.51.100.20",
+      "x-forwarded-for": address,
       "x-nowpayments-sig": createHmac("sha512", secret).update(JSON.stringify(sorted)).digest("hex"),
     },
     body: JSON.stringify(body),
@@ -529,6 +533,53 @@ describe("NOWPayments callbacks", () => {
     });
     expect(await payments(db()).countDocuments({ invoiceId: invoice._id })).toBe(1);
     expect(await outboxLabels()).toHaveLength(2);
+  });
+
+  it("apply each payment once in a shuffled flood of 500 callbacks", async () => {
+    const STATUSES = ["waiting", "confirming", "confirmed", "sending", "finished"];
+    const paid: InvoiceDoc[] = [];
+    const flood: Record<string, unknown>[] = [];
+    for (let n = 0; n < 5; n += 1) {
+      const invoice = await issued();
+      const attempt = await checkoutOf(invoice);
+      const paymentId = 6_000_000_100 + n;
+      remote.payments.set(String(paymentId), nowPayment(invoice, attempt, paymentId, "finished"));
+      paid.push(invoice);
+      for (let copy = 0; copy < 20; copy += 1) {
+        for (const [index, status] of STATUSES.entries()) {
+          flood.push({
+            ...nowPayment(invoice, attempt, paymentId, status),
+            updated_at: `2026-09-28T06:3${index}:00.000Z`,
+          });
+        }
+      }
+    }
+    // Shuffled the same way every run, and sent at once from NOWPayments' few addresses.
+    let seed = 7;
+    for (let i = flood.length - 1; i > 0; i -= 1) {
+      seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31;
+      const j = seed % (i + 1);
+      [flood[i], flood[j]] = [flood[j]!, flood[i]!];
+    }
+    const responses = await Promise.all(
+      flood.map((body, index) => callback(body, SECRET, `198.51.100.${20 + (index % 5)}`)),
+    );
+    const outcomes = await Promise.all(
+      responses.map(async (response) => ((await response.json()) as { outcome: string }).outcome),
+    );
+    expect(outcomes).toHaveLength(500);
+    expect(outcomes.filter((outcome) => outcome === "confirmed")).toHaveLength(5);
+    expect(
+      outcomes.filter((outcome) => !["confirmed", "ignored", "duplicate", "busy"].includes(outcome)),
+    ).toEqual([]);
+    for (const invoice of paid) {
+      expect(await invoices(db()).findOne({ _id: invoice._id })).toMatchObject({
+        status: "paid",
+        paidMinor: 92_500,
+      });
+      expect(await payments(db()).countDocuments({ invoiceId: invoice._id })).toBe(1);
+    }
+    expect(await outboxLabels()).toHaveLength(10);
   });
 
   it("never move a confirmed payment back", async () => {

@@ -178,9 +178,9 @@ export function BookingFlow({
             <path d="M4.5 10.5l3.5 3.5 7.5-8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </p>
-        <h2 ref={heading} tabIndex={-1} className="mt-5 text-2xl font-semibold tracking-tight outline-none">
+        <h3 ref={heading} tabIndex={-1} className="mt-5 text-2xl font-semibold tracking-tight outline-none">
           {done.status === "confirmed" ? "Booked." : "Request sent."} {when}
-        </h2>
+        </h3>
         <p className="mt-3 max-w-xl text-muted">
           {done.status === "confirmed"
             ? `A confirmation with the calendar invite is on its way to ${values.email}.`
@@ -229,7 +229,7 @@ export function BookingFlow({
       {step === "time" ? (
         <div className="grid gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold tracking-tight">Pick a time</h2>
+            <h3 className="text-lg font-semibold tracking-tight">Pick a time</h3>
             <ZoneSelect id="booking-zone" zone={zone} zones={zones} onChange={setZone} />
           </div>
           <SlotPicker slots={slots} zone={zone} day={day} onDay={setDay} value={slot} onChange={choose} />
@@ -237,7 +237,7 @@ export function BookingFlow({
       ) : (
         <form onSubmit={submit} noValidate className="grid gap-5" aria-labelledby="booking-details-title">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2
+            <h3
               id="booking-details-title"
               ref={heading}
               tabIndex={-1}
@@ -247,7 +247,7 @@ export function BookingFlow({
               <span className="ml-2 text-sm font-normal text-muted">
                 {type.durationMinutes} minutes, {zone.replaceAll("_", " ")}
               </span>
-            </h2>
+            </h3>
             <button
               type="button"
               onClick={() => setStep("time")}

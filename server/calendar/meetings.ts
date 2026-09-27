@@ -15,7 +15,7 @@ import { blocks, bookingDays, getCalendarSettings, meetings, slotLocks } from "@
 import type { LocationKind, MeetingDoc, MeetingStatus } from "@/server/calendar/types";
 import { now } from "@/server/clock";
 import { inTransaction } from "@/server/db/transaction";
-import { decryptSecret, encryptSecret } from "@/server/security/encryption";
+import { DecryptionError, decryptSecret, encryptSecret } from "@/server/security/encryption";
 
 // Meetings and the rules that keep the calendar consistent. A meeting holds its 15-minute cells as
 // documents with the cell as their id (slot_locks), and each day's count sits in one document
@@ -192,6 +192,17 @@ export async function getMeeting(db: Db, id: ObjectId): Promise<MeetingDoc | nul
 // The secret of a meeting's reschedule-and-cancel link, for emails sent after the booking.
 export function manageTokenOf(meeting: Pick<MeetingDoc, "_id" | "manageTokenSealed">): string {
   return decryptSecret(meeting.manageTokenSealed, `meeting:${meeting._id.toHexString()}`);
+}
+
+// The same for pages, which show the link only if they can: null when the key that sealed it has been
+// retired (the guest still has the link in their emails).
+export function readableManageToken(meeting: Pick<MeetingDoc, "_id" | "manageTokenSealed">): string | null {
+  try {
+    return manageTokenOf(meeting);
+  } catch (error) {
+    if (error instanceof DecryptionError) return null;
+    throw error;
+  }
 }
 
 export async function findMeetingByToken(db: Db, token: string): Promise<MeetingDoc | null> {

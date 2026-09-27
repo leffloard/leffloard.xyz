@@ -86,6 +86,35 @@ describe("passwordStep", () => {
     expect(await db().collection("audit_log").countDocuments({ action: "auth.login.locked" })).toBe(1);
   });
 
+  it("tells the owner when password sign-in is locked, without saying who or from where", async () => {
+    const start = new Date("2026-09-28T09:00:00Z");
+    setClock(() => start);
+    await createOwner(db(), OWNER);
+    const fail = (email: string, ip: string) => passwordStep(db(), { email, password: "nope" }, client(ip));
+    for (let attempt = 0; attempt < 5; attempt++) await fail(OWNER.email, "203.0.113.5");
+    // Each further failure locks again once the lock has run out; the owner hears again when the lock grows,
+    // at the 10th.
+    for (let failure = 6; failure <= 10; failure++) {
+      setClock(() => new Date(start.getTime() + (failure - 5) * 16 * 60_000));
+      await fail(OWNER.email, "203.0.113.5");
+    }
+    // Addresses that aren't an account: once a day, however many.
+    for (const stranger of ["stranger@example.com", "another@example.com"]) {
+      for (let attempt = 0; attempt < 5; attempt++) await fail(stranger, "203.0.113.77");
+    }
+
+    const alerts = await db().collection("notifications").find().sort({ createdAt: 1, _id: 1 }).toArray();
+    expect(alerts.map((alert) => [alert.kind, alert.title, alert.href])).toEqual([
+      ["problem", "Password sign-in locked after 5 failed attempts", "/admin/security"],
+      ["problem", "Password sign-in locked after 10 failed attempts", "/admin/security"],
+      ["problem", "Failed sign-ins with an address that isn't an account", "/admin/security"],
+    ]);
+    expect(alerts[0]!.body).toContain("28 Sep 2026, 12:15");
+    const text = JSON.stringify(alerts);
+    for (const detail of ["203.0.113", "stranger@", "another@", OWNER.email])
+      expect(text).not.toContain(detail);
+  });
+
   it("rate-limits one address, whatever the account", async () => {
     for (let attempt = 0; attempt < 20; attempt++) {
       await passwordStep(
@@ -180,6 +209,12 @@ describe("secondFactorStep", () => {
     }
     const last = await secondFactorStep(db(), { pendingToken, code: "000000" }, client());
     expect(last.status).toBe("locked");
+    // The password was right: the owner is told so, and to change it.
+    const alert = await db()
+      .collection("notifications")
+      .findOne({ key: { $regex: "^signin-locked:" } });
+    expect(alert).toMatchObject({ kind: "problem", title: "Your password was right, the codes were wrong" });
+    expect(alert?.body).toContain("Change your password");
   });
 
   it("lets each recovery code in exactly once, even when two requests race", async () => {

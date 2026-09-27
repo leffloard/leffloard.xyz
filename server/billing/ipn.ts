@@ -1,6 +1,8 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { MongoServerError, ObjectId, type Db } from "mongodb";
+import { ADMIN_TIME_ZONE } from "@/lib/format";
+import { todayIn } from "@/lib/intake/time";
 import { payments } from "@/server/billing/collections";
 import { getInvoice } from "@/server/billing/invoices";
 import { alertPayment, emailReceipt, type BillingNotify } from "@/server/billing/notify";
@@ -14,6 +16,7 @@ import {
 import { applyProviderStatus, getPayment, type ProviderUpdate } from "@/server/billing/payments";
 import { now } from "@/server/clock";
 import { log } from "@/server/log";
+import { DailyCap } from "@/server/security/memory-limit";
 
 // NOWPayments' payment callbacks (IPN). Each is checked for its signature and stored before anything else, so
 // a repeat is recognised; then the payment's status is read back from NOWPayments' API, matched against our
@@ -36,6 +39,10 @@ type EventDoc = {
 
 const KEEP_MS = 400 * 86_400_000; // a year and a bit: the trail of every payment
 const KEEP_REJECTED_MS = 7 * 86_400_000;
+// Forged or broken callbacks are logged for the owner to see, but only so many a day: they come from anyone,
+// and each is a document in a small database.
+const REJECTED_PER_DAY = 500;
+const rejectedLog = new DailyCap(REJECTED_PER_DAY);
 const LEASE_MS = 2 * 60_000; // a callback being handled for longer than this has stopped half way
 const DUPLICATE_KEY = 11000;
 
@@ -69,6 +76,11 @@ export async function handleNowPaymentsIpn(
   const status = typeof record.payment_status === "string" ? record.payment_status.slice(0, 40) : null;
 
   if (!ipnSignatureValid(body, signature, config.ipnSecret)) {
+    const allowance = rejectedLog.take(todayIn(ADMIN_TIME_ZONE, at));
+    if (allowance === "just-full") {
+      log.warn({ limit: REJECTED_PER_DAY }, "NOWPayments: today's log of rejected callbacks is full");
+    }
+    if (allowance !== "allowed") return { status: 401, outcome: "rejected" };
     await events(db).insertOne({
       _id: `rejected:${randomUUID()}`,
       provider: "nowpayments",

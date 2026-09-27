@@ -10,4 +10,5 @@ egefitnessalwaysinbussinies.bat
 coverage/
 playwright-report/
 test-results/
+.lighthouseci/
 package-lock.json

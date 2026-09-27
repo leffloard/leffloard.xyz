@@ -51,7 +51,7 @@ export default async function BookTypePage(props: Props) {
   return (
     <>
       <PageIntro label="Book a call" title={type.title} intro={type.description || undefined} />
-      <Section id="book" index="01" label="Pick a time">
+      <Section id="book" index="01" label="Booking">
         <div className="grid gap-10 lg:grid-cols-12">
           <div className="lg:col-span-8">
             <BookingFlow

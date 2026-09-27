@@ -25,6 +25,9 @@ design and every dependency.
 | Owner account tools              | `npm run admin -- create`, `status`, `reset-password`, `reset-2fa`, `unlock`         |
 | Checks                           | `npm run format:check`, `npm run lint`, `npm run typecheck`                          |
 | Tests                            | `npm run test:unit`, `npm run test:integration`, `npm run build && npm run test:e2e` |
+| Security suite                   | `npm run test:security`                                                              |
+| Other browsers and phones        | `PW_ALL_BROWSERS=1 npm run test:e2e`                                                 |
+| Load tests (by hand, see README) | `npm run e2e:server`, then `k6 run load/<script>.js`                                 |
 
 Machines that cannot download MongoDB or Playwright's Chromium can point the tests at local binaries with
 `MONGOMS_SYSTEM_BINARY=/path/to/mongod` and `PW_CHROMIUM_PATH=/path/to/chrome`.
@@ -107,3 +110,15 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
   exists). Shortcuts are two keys after `g` or `c`; `j`, `k`, `x`, `n` and `/` belong to the pages' lists.
 - `log.error` lines are shown on the System page (after redaction): name what failed, and don't put secrets
   or visitor text in the message.
+- The security suite (`tests/security`) finds new actions, pages and routes by itself: an exported server
+  action must be `adminAction()` (or one of the sign-in actions listed with their files), never declared
+  with an inline "use server", and a route that takes data from the public must check its origin
+  (`readJsonPost()`, `readPortalPost()` or `isSameOriginRequest()`). Keep it passing; don't add exceptions.
+- Pages stay within `tests/e2e/budgets.spec.ts` (150 KB of JavaScript gzipped, 30 KB of CSS, 80 KB of
+  fonts). Fonts come from `components/fonts`, never `geist/font/*` directly; a character the subsets lack
+  is added with the command in `components/fonts/index.ts`.
+- Every page passes axe (WCAG 2.2 AA and best practices). Headings never skip a level (a label-only
+  `Section`'s label is its `h2`), landmarks of one kind get distinct labels, and a new admin page is added to
+  `tests/e2e/accessibility.spec.ts`. Motion never keeps readable text faded: reveals use `.reveal`.
+- A new setting that is a secret gets a row in `docs/RUNBOOK.md` ("Changing secrets"): where to make a new
+  one and what else to do.

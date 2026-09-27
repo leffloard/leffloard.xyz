@@ -13,7 +13,7 @@ test.beforeEach(async () => {
 
 async function axeViolations(page: Page): Promise<string[]> {
   const result = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"])
     .analyze();
   return result.violations.map(
     (violation) => `${violation.id}: ${violation.nodes.map((node) => node.target).join(" ")}`,
@@ -21,6 +21,9 @@ async function axeViolations(page: Page): Promise<string[]> {
 }
 
 const inquiriesFrom = (email: string) => withDb((db) => db.collection("inquiries").find({ email }).toArray());
+
+// An address of this test's own: the other browsers' projects send the same messages at the same time.
+const address = (name: string) => `${name}.${test.info().project.name}@example.com`;
 
 test("a project brief takes three short steps and reaches the inbox", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -55,12 +58,12 @@ test("a project brief takes three short steps and reaches the inbox", async ({ p
   await form.getByRole("button", { name: "Continue" }).click();
 
   await form.getByLabel("Your name").fill("Alan Turing");
-  await form.getByLabel("Email", { exact: true }).fill("alan.brief@example.com");
+  await form.getByLabel("Email", { exact: true }).fill(address("alan.brief"));
   await form.getByRole("checkbox", { name: /Don't use AI tools/ }).check();
   await form.getByRole("button", { name: "Send message" }).click();
 
   await expect(page.getByRole("heading", { name: "Thanks, Alan. Your message is in." })).toBeFocused();
-  const [stored] = await inquiriesFrom("alan.brief@example.com");
+  const [stored] = await inquiriesFrom(address("alan.brief"));
   expect(stored).toMatchObject({
     kind: "brief",
     source: "form",
@@ -91,12 +94,12 @@ test.describe("with the visitor's clock in Istanbul", () => {
     await form.getByLabel("Time", { exact: true }).fill("14:30");
     await form.getByText("45 minutes").click();
     await form.getByLabel("Your name").fill("Ada Lovelace");
-    await form.getByLabel("Email", { exact: true }).fill("ada.call@example.com");
+    await form.getByLabel("Email", { exact: true }).fill(address("ada.call"));
     expect(await axeViolations(page)).toEqual([]);
     await form.getByRole("button", { name: "Send message" }).click();
 
     await expect(page.getByRole("heading", { name: "Thanks, Ada. Your message is in." })).toBeVisible();
-    const [stored] = await inquiriesFrom("ada.call@example.com");
+    const [stored] = await inquiriesFrom(address("ada.call"));
     expect(stored).toMatchObject({
       kind: "call",
       call: { timeZone: "Europe/Istanbul", date, time: "14:30", duration: 45 },
@@ -116,10 +119,10 @@ test("a question is one step, and the server's field errors show up in the form"
   // The browser check catches it first, with the server's own wording.
   await expect(form.getByText("Please enter a valid email address.")).toBeVisible();
 
-  await form.getByLabel("Email", { exact: true }).fill("grace.question@example.com");
+  await form.getByLabel("Email", { exact: true }).fill(address("grace.question"));
   await form.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByRole("heading", { name: "Thanks, Grace. Your message is in." })).toBeVisible();
   await page.getByRole("button", { name: "Send another message" }).click();
   await expect(form.getByLabel("Your name")).toHaveValue("");
-  expect(await inquiriesFrom("grace.question@example.com")).toHaveLength(1);
+  expect(await inquiriesFrom(address("grace.question"))).toHaveLength(1);
 });
