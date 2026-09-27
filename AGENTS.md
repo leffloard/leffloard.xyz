@@ -23,6 +23,7 @@ design and every dependency.
 | Development server               | `npm run dev`                                                                        |
 | Apply migrations to `MONGO_URL`  | `npm run migrate` (`-- --status` to only list them)                                  |
 | Owner account tools              | `npm run admin -- create`, `status`, `reset-password`, `reset-2fa`, `unlock`         |
+| Everything CI checks, in order   | `npm run verify`                                                                     |
 | Checks                           | `npm run format:check`, `npm run lint`, `npm run typecheck`                          |
 | Tests                            | `npm run test:unit`, `npm run test:integration`, `npm run build && npm run test:e2e` |
 | Security suite                   | `npm run test:security`                                                              |
@@ -84,6 +85,9 @@ Machines that cannot download MongoDB or Playwright's Chromium can point the tes
   links). Store only the SHA-256 of links and session tokens, and never log them.
 - Every change comes with tests. Unit tests need no database; integration tests use the throwaway replica set
   from `tests/integration/global-setup.ts`.
+- GitHub Actions doesn't run for this account for now, so nothing checks a push but you: run `npm run verify`
+  before pushing, and v1's `python -m pytest -q` when `backend/` changed (`docs/RUNBOOK.md`, "Without GitHub
+  Actions").
 - Content scope: no case studies, marketing copy or pricing for game-modification projects or cheat loaders.
 - Public content states only verifiable facts. Private projects never link to their code and never name
   customers, amounts, domains or ids. The leak check (`lib/content/leaks.ts`) runs before every publication,

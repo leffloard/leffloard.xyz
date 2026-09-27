@@ -143,12 +143,14 @@ test("the project board moves a project to the next stage", async ({ page }) => 
     }
     await expect(active.locator("[data-card]", { hasText: "Shop rebuild" })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  expect(await axeViolations(page)).toEqual([]);
   await expect
     .poll(() =>
       withDb((db) => db.collection("projects").findOne({ title: "Shop rebuild" })).then((p) => p?.stage),
     )
     .toBe("active");
+  // The card moves before the server answers, and the page its answer re-renders (the <title> included) may
+  // still be arriving: check until the page has settled.
+  await expect.poll(() => axeViolations(page)).toEqual([]);
 });
 
 test("only one timer runs, and stopping it records the time", async ({ page }) => {

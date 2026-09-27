@@ -248,6 +248,7 @@ the reports asks you to confirm it's you.
 | `npm run restore -- <file> --check` | Restore drill: restores a backup into a temporary database, compares, deletes it |
 | `npm run admin -- <command>` | Owner account tools: `create`, `status`, `reset-password`, `reset-2fa`, `unlock` |
 | `npm run build`, then `npm start` | Production build, started the way the server runs it |
+| `npm run verify` | Every check CI's checks job runs, in its order (formatting, lint, types, the unit, integration and security tests, the build, the browser tests, the production audit). Run it before anything is merged into `main`: GitHub Actions is off for now ([docs/RUNBOOK.md](docs/RUNBOOK.md#without-github-actions)) |
 | `npm run lint`, `npm run typecheck`, `npm run format` | Code checks and formatting |
 | `npm run test:unit`, `npm run test:integration` | Tests (the integration tests start their own MongoDB) |
 | `npm run build`, then `npm run test:e2e` | Browser tests (first time: `npx playwright install chromium`) |

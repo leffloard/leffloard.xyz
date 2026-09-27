@@ -1,0 +1,5 @@
+# Fake values in tests, not secrets: the leak check's own fixtures (an SMTP_PASSWORD line it must refuse)
+# and a booking's idempotency key. One gitleaks fingerprint per line: commit:file:rule:line.
+cae44c2154c5744fe1f7362e6fe184d9458ba759:tests/e2e/content.spec.ts:generic-api-key:90
+cae44c2154c5744fe1f7362e6fe184d9458ba759:tests/unit/leaks.test.ts:generic-api-key:27
+19f9865d6d2596ee9a394bce3c22a3b4357ad5fb:tests/integration/bookings-route.test.ts:generic-api-key:200
