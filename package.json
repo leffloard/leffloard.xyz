@@ -19,6 +19,7 @@
     "test:integration": "vitest run --project integration",
     "test:security": "vitest run --project security",
     "test:e2e": "playwright test",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:integration && npm run test:security && npm run build && npm run test:e2e && npm audit --omit=dev --audit-level=high",
     "e2e:server": "node --conditions=react-server --import tsx scripts/e2e-server.ts",
     "migrate": "tsx --conditions=react-server scripts/migrate.ts",
     "migrate-legacy": "tsx --conditions=react-server scripts/migrate-legacy.ts",

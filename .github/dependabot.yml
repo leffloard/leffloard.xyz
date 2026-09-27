@@ -6,6 +6,18 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 10
+    ignore:
+      # The types follow the oldest Node the app supports (package.json "engines"), not the newest release.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # ESLint 10 breaks the plugins eslint-config-next 16 brings (react, import, jsx-a11y). Lift this once an
+      # eslint-config-next release supports it.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint (in eslint-config-next) refuses TypeScript 7.0; tsc 7 itself checks this code
+      # cleanly. Lift this once a typescript-eslint release supports it.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       next-react:
         patterns:

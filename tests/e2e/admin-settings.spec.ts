@@ -18,13 +18,18 @@ test("back up now writes an encrypted backup and lists it", async ({ page }) => 
   await card.getByRole("button", { name: "Back up now" }).click();
   await expect(card.getByText(/^Backup written: leffloard-leffloard_e2e-\d{8}T\d{6}Z\.lfbak/)).toBeVisible();
   await expect(card.getByText("up to date")).toBeVisible();
-  // The nightly job may also have run during the tests (it catches up after 03:15), so at least one.
   await expect(card.locator("li").first()).toContainText(/^leffloard-leffloard_e2e-\d{8}T\d{6}Z\.lfbak/);
-  const files = readdirSync(E2E_BACKUP_DIR).filter((name) => name.endsWith(".lfbak"));
-  expect(files.length).toBeGreaterThanOrEqual(1);
-  expect(await card.locator("li").count()).toBe(files.length);
+  // The nightly job may write one too, even during this test: it checks every quarter of an hour and catches
+  // up after 03:15. So the page lists what the folder holds once both are read after its last file.
+  await expect(async () => {
+    await page.reload();
+    const files = readdirSync(E2E_BACKUP_DIR).filter((name) => name.endsWith(".lfbak"));
+    expect(files.length).toBeGreaterThanOrEqual(1);
+    await expect(card.locator("li")).toHaveCount(files.length, { timeout: 1000 });
+  }).toPass();
 
+  // Other jobs may have run by now too, each with its own "ok": look at the backup's row.
   const jobs = page.locator("section", { has: page.getByRole("heading", { name: "Background jobs" }) });
-  await expect(jobs.getByText("backup", { exact: true })).toBeVisible();
-  await expect(jobs.getByText("ok", { exact: true })).toBeVisible();
+  const backupJob = jobs.locator("li", { has: page.getByText("backup", { exact: true }) });
+  await expect(backupJob.getByText("ok", { exact: true })).toBeVisible();
 });

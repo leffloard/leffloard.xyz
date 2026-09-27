@@ -823,10 +823,16 @@ request: the end-to-end tests, then the public pages in the other browsers and o
 eight public pages as a phone and as a desktop (median of three runs; performance at least 90,
 accessibility, best practices and SEO 100, layout shift at most 0.02; blocking time over 150 ms and a
 largest paint over 1.8 s are warnings), the security suite, `npm audit` of every dependency, a secret scan
-of the whole history (gitleaks) and CodeQL. Scheduled workflows run on the default branch, so the nightly
-starts once this branch is merged.
+of the whole history (gitleaks) and CodeQL. Scheduled workflows run on the default branch.
 
-Dependabot proposes npm and GitHub Actions updates weekly; `next`, `react` and their types are grouped.
+GitHub Actions doesn't run jobs for this account for now, so both workflows are disabled and kept as they are
+for when it does. Until then `npm run verify` runs the checks job's steps in the same order on any machine
+before a merge, and `docs/RUNBOOK.md` ("Without GitHub Actions") lists what else to run by hand.
+
+Dependabot proposes npm and GitHub Actions updates weekly; `next`, `react` and their types are grouped. It
+skips new major versions of `@types/node` (the types follow the oldest Node in `engines`), and of ESLint and
+TypeScript until the plugins in `eslint-config-next` support them (ESLint 10, TypeScript 7);
+`.github/dependabot.yml` says when to lift each.
 
 ## Dependencies
 

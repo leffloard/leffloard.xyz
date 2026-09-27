@@ -178,7 +178,7 @@ Once nothing points at v1 any more, in one pull request:
    `eslint.config.mjs` (`globalIgnores`) and `tsconfig.json` (`exclude`).
 3. README: remove the "v1 (current live site)" half and the note at the top that points to it.
 4. `tests/legacy-parity.md`: note that the Python tests were removed and live on under the `v1-legacy` tag.
-5. `npm run format:check`, `npm run lint`, `npm run typecheck`, all tests, then merge.
+5. `npm run verify` (and CI, if it runs), then merge.
 
 Outside the repository:
 
@@ -188,14 +188,58 @@ Outside the repository:
 - The `requests` collection can stay (it is small, and `migrate-legacy --verify` reads it). To drop it, make a
   backup first.
 
+## Without GitHub Actions
+
+GitHub Actions doesn't run jobs for this account for now, so the **CI** and **Nightly** workflows are disabled
+(Actions tab → the workflow → ⋯ → **Disable workflow**) instead of failing on every push and every night.
+The site doesn't need them: `deploy.ps1` builds, migrates, checks and rolls back on the server by itself.
+What they checked is checked by hand instead, in a copy of the repository (not on the server).
+
+**Before anything is merged into `main`**, on the branch to be merged (a pull request, Dependabot's too:
+`git fetch origin pull/<number>/head`, then `git checkout FETCH_HEAD`):
+
+```powershell
+npm ci
+npm run verify
+```
+
+`verify` runs CI's checks job in its order and stops at the first failure: formatting, lint, types, the unit,
+integration and security tests, the build, the browser tests and the audit of production dependencies. The
+first time on a machine, run `npx playwright install chromium` before it. Also:
+
+- When `deploy/` changed, the deploy scripts' tests, in the Windows PowerShell 5.1 the server has (CI's
+  Windows job ran them): `powershell -NoProfile -ExecutionPolicy Bypass -File deploy\windows\tests\common.tests.ps1`.
+- When `backend/` changed (until v1 is removed): `pip install -r backend/requirements-dev.txt`, then
+  `python -m pytest -q`.
+
+**Once a month**, what the nightly workflow checked, after `npm ci` and `npm run build`:
+
+```powershell
+npm run test:security
+npm audit --audit-level=moderate
+npx --yes @lhci/cli@0.15.1 autorun
+npx --yes @lhci/cli@0.15.1 autorun --collect.settings.preset=desktop
+npx playwright install firefox webkit
+$env:PW_ALL_BROWSERS = "1"; npx playwright test --project firefox --project webkit --project pixel --project iphone --no-deps; Remove-Item Env:PW_ALL_BROWSERS
+gitleaks git --redact
+```
+
+The last line scans the whole history for secrets and should find none (`.gitleaksignore` lists the tests'
+fake values); gitleaks is a single program (its Windows build is on
+[its releases page](https://github.com/gitleaks/gitleaks/releases)). CodeQL has no stand-in; the security
+suite and lint cover the main risks.
+
+When Actions runs jobs again, enable both workflows on the Actions tab.
+
 ## Routine
 
 **Every week**
 
-- Merge Dependabot's pull requests once CI is green (Monday). Security fixes for Next.js go out at once:
-  `.\deploy.ps1`.
+- Dependabot's pull requests (Monday): merge each once CI is green or, while Actions is off, once `npm ci`
+  and `npm run verify` pass on it. Security fixes for Next.js go out at once: `.\deploy.ps1`.
 - Glance at the nightly workflow on GitHub (Actions → Nightly): every browser, Lighthouse, the security
-  suite, the dependency audit, the secret scan and CodeQL.
+  suite, the dependency audit, the secret scan and CodeQL. While Actions is off, run its checks by hand once
+  a month instead ("Without GitHub Actions").
 
 **Every month**
 
